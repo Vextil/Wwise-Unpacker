@@ -1,0 +1,79 @@
+# scan data for wave files
+# RIFF and RIFX header supported
+# note: There are wave files with a wrong file size after RIFF/RIFX
+#       This script takes the stream size, adds the header size and writes the correct size after RIFF/RIFX
+# (c) 2012-06-26 by AlphaTwentyThree
+#
+# future update plans:
+# - option to also write data between found wave files to disk
+# - option to automatically transform the file to a playable or at least decodable format
+
+for i = 1                        # run through loop with count variable i
+   FindLoc OFFSET string "WAVE" 0 ""   # search for "WAVE", save position as variable OFFSET
+   if OFFSET == ""                  # when nothing is found
+      cleanexit                  # the script exits (e.g. at end of file)
+   endif
+   math OFFSET -= 8               # jump to possible
+   goto OFFSET                     # RIFF/RIFX file start
+   getDstring IDENT 4               # read string of 4 bytes, save variable as IDENT
+   if IDENT == "RIFX"               # differentiate between header possibilities
+      endian big                  # set endianness to big, if file has RIFX identifier
+      callfunction write 1         # see function section below
+   elif IDENT == "RIFF"            # endianness stays little
+      callfunction write 1         # also run function
+   else                        # string "WAVE" found, but doesn't belong to wave file
+      set SIZE 0xc               # do as if something with 0xc bytes was found to continue search from the right position
+   endif
+   set SEARCH OFFSET               # set marker to position from where to search next
+   math SEARCH += SIZE               # (that would be after the file that was found)
+   if SEARCH == FSIZE               # in case the last found file ends with the main file, we exit
+      cleanexit
+   endif
+   goto SEARCH                     # if we haven't exited the script above, we set out cursor to after the last found file
+next i
+
+startfunction write                  # function "write" starts here, is called when a wave file is found above
+   get NAME basename               # save name without extension under variable NAME
+   string NAME += "_"               # add underscore to the name
+   string NAME += i               # add the loop variable to the name
+   goto OFFSET                     # set cursor to the beginning of the found file
+   get DUMMY long                  # RIFF/RIFX identifier, not needed
+   get DUMMY long                  # riff size, not needed
+   get DUMMY long                  # "WAVE", not needed, we arrive at the "fmt " section
+   for                           # loop search for the "data" section at the start of the stream (get the stream size from there)
+      getDstring AREA_NAME 4         # name of area in header
+      get AREA_SIZE long            # size of area in header
+      savepos MYOFF               # save position we are at
+      if AREA_NAME == "data"         # when we arrive at the needed "data" area:
+         break                  # we exit the loop
+      else                     # otherwise:
+         if AREA_NAME == "LIST"      # that's the area of the marker names
+            callfunction retrievename 1 # see below
+         endif
+         math MYOFF += AREA_SIZE      # not reached "data" area -> adjust cursor position...
+         goto MYOFF               # ... and go there
+      endif
+   next                        # remember: the cursor is now directly at the stream start
+   set STREAMSIZE AREA_SIZE         # the last AREA_SIZE is the size we need (size of the audio stream)
+   set HEADERSIZE MYOFF            # 
+   math HEADERSIZE -= OFFSET         # calculate the size of the stream header (offset - offset = size)
+   set SIZE HEADERSIZE               # 
+   math SIZE += STREAMSIZE            # calculate complete file size (header + stream = file)
+   log MEMORY_FILE OFFSET SIZE         # write file to memory
+   math SIZE -= 8                  # subtract 8 bytes to get the riff size
+   putVarChr MEMORY_FILE 4 SIZE long    # write the correct riff size to the header inside the memory
+   string NAME += ".wav"            # add extension to the name (the name could contain the name of the first marker if the file has markers)
+   math SIZE += 8                  # add the subtracted 8 bytes again
+   log NAME 0 SIZE MEMORY_FILE         # write file in memory to disk
+endfunction                        # remember that we continue with our next i now!
+
+startfunction retrievename            # get possible file name from first marker name, rmember: our cursor is after the size of the LIST area
+   get DUMMY long                   # always "adtl", not needed
+   get DUMMY long                  # always "labl", not needed
+   get MSIZE long                  # size of the label area for this marker
+   math MSIZE -= 4                  # subtracting 4 bytes leaves us with the length of the marker label
+   get DUMMY long                  # marker type, not needed
+   getDstring MNAME MSIZE            # cursor is at the beginning of the label name, now get the marker name with the desired length MSIZE
+   string NAME += "~"
+   string NAME += MNAME            # add the marker name to the file name
+endfunction
