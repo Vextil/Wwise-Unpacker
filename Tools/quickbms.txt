@@ -1,0 +1,4429 @@
+#######################################################################
+
+
+QuickBMS
+by Luigi Auriemma
+e-mail: me@aluigi.org
+web:    aluigi.org
+home:   http://quickbms.aluigi.org
+help:   http://zenhax.com
+
+
+#######################################################################
+
+
+1) Introduction
+2) Usage
+3) Reimporting the extracted files
+4) How to create scripts (for developers only!)
+5) Experimental input, output and other features
+6) Notes
+7) Support
+8) Additional credits
+
+
+#######################################################################
+
+===============
+1) Introduction
+===============
+
+
+QuickBMS is a multiplatform extractor engine that can be programmed
+through some simple textual scripts, it's intended for extracting files
+and information from the archives of any program and moreover games.
+
+The script language from which QuickBMS is derived is MexScript
+documented here: http://wiki.xentax.com/index.php/BMS
+So QuickBMS is FULLY compatible with that original syntax and all the
+scripts that were created here:
+http://forum.xentax.com/viewtopic.php?t=1086
+
+QuickBMS supports also the WCX plugins of Total Commander:
+  http://www.totalcmd.net/directory/packer.html
+  http://www.ghisler.com/plugins.htm
+
+I improved the original BMS language for:
+- removing some implied fields, like the file number in some commands
+- adding new commands, like Encryption
+- adding new behaviors and features, like negative GoTo
+These improvements allow QuickBMS to work with tons of simple and
+complex formats and even doing things like modifying files, creating
+new files with headers, converting files and reimporting files back in
+their original archives.
+
+The tool is open source under the GPL license and works on both Windows
+and Linux and on both little and big endian architectures like Intel
+and PPC.
+Basically it means that you can distribute the original quickbms.exe
+file as you desire but reusing its source code or modifying it may
+require you to adopt the same open source license.
+
+The official homepage of QuickBMS is:
+
+  http://quickbms.aluigi.org
+
+In case it doesn't work try:
+
+  http://aluigi.altervista.org/quickbms.htm
+
+There is also an official forum where I provide support for Quickbms
+and help with file formats:
+
+  http://zenhax.com
+
+QuickBMS is perfect for those works in which you need a quick way to
+extract information from files and at the same time you would like to
+reinject them back without writing a standalone tool to do both the
+works (extraction and rebuilding).
+This is particularly useful if you have 100 different types of archives
+to analyze (reverse engineering), parse and then sharing your tools
+with your community.
+
+A BMS script is just a text file so you can paste it in a forum, or in
+paste-bin or anywhere you desire.
+
+For Linux users there is a Makefile in the src folder, the only
+requirements are openssl, zlib, bzip2 and lzo while the optional
+components are ucl, mcrypt and tomcrypt (uncomment the commented line
+near the end of the Makefile to enable them).
+If your distro supports apt-get and you have problems during the usage
+of "make", try the following:
+
+  apt-get install gcc g++ zlib1g-dev libbz2-dev libssl-dev liblzo2-dev unicode
+
+In case of problems on 64bit versions of Linux, try also to append a
+":i386" to the previous dependencies, like:
+
+  apt-get install libssl-dev:i386 libbz2-dev:i386 liblzo2-dev:i386
+
+
+#######################################################################
+
+========
+2) Usage
+========
+
+
+Simple and quick:
+
+- double-click on quickbms.exe
+
+- select the script or the plugin for the type of archive you want to
+  extract, for example zip.bms if it's a zip file.
+
+- select the input archive or multiple files.
+  you can also select a whole folder by entering in it and then typing
+  * (or "" on systems before Windows 7) in the "File name:" field, and
+  then select Open.
+  You can even use * to set wildcards, for example *.txt or *required_name*
+  or prefix*suffix
+
+- select the output folder where extracting the files.
+  you can specify any filename, it will be ignored because only the
+  directory is taken
+
+- watch the progress status of the extraction
+
+That's the simple "GUI" usage but QuickBMS can do various other things
+when launched from the console, in fact it supports many command-line
+options for advanced users and for who writes the scripts.
+You can view all the available options simply launching QuickBMS from
+command-line ("cmd.exe" on Windows) without arguments.
+The following is the current list of options:
+
+
+    Usage: quickbms.exe
+             [options]
+               <script.BMS>
+                 <input_archive/folder>
+                   [output_folder]
+
+    Options:
+    -l     list the files without extracting them
+    -f W   filter the files to extract using the W wildcards separated by comma or
+           semicolon, example -f "*.mp3,*.txt;*myname*"
+           if the filter starts with ! it's considered an ignore filter
+           the filter can be also a text file containing filters
+           example: quickbms -f "*.mp3;!*.ogg" script.bms archive.dat output
+           example: quickbms -f myfilters_list.txt script.bms archive.dat
+           please use {} instead of * to avoid problems on Windows, you can also
+           use multiple -f if you feel more comfortable
+    -F W   as above but works only with the files in the input folder (if used)
+           example: quickbms -F "*.dat" script.bms input_folder output_folder
+    -o     if the output files already exist this option will overwrite them
+           automatically without asking the user confirmation
+    -k     keep the current files if already exist without asking (skip all)
+    -r     experimental reimport option that should work with many archives:
+             quickbms script.bms archive.pak output_folder
+             modify the needed files in output_folder and maybe remove the others
+             quickbms -w -r script.bms archive.pak output_folder
+           you must read section 3 of quickbms.txt before using this feature
+    -u     check if there is a new version of QuickBMS available
+    -i     generate an ISO9660 file instead of extracting every file, the name of
+           the ISO image will be the name of the input file or folder
+    -z     exactly as above but generate a ZIP file
+
+    Advanced options:
+    -d     automatically create an additional output folder with the name of the
+           input folder and file processed, eg. models/mychar/mychar.arc/FILES,
+           -d works also if input and output folders are the same (rename folder)
+    -D     similar to -d but will not create the folder with the filename
+    -E     experimental option for automatically reversing the endianess of any
+           file simply reading it field by field (so each get will produce a put)
+    -c     quick list of the basic BMS commands and some notes about this tool
+    -S CMD execute the command CMD on each file extracted, you must specify the
+           #INPUT# placeholder which will be replaced by the name of the file
+           example: -S "lame -b 192 -t --quiet #INPUT#"
+    -Y     automatically answer yes to any question
+    -O F   redirect the output of all the extracted files to the file F
+    -s SF  add a script file or command before the execution of the input script,
+           useful if an archive uses a different endianess or encryption and so on
+           SF can be a script or directly the bms instruction you want to execute
+    -.     don't terminate QuickBMS if there is an error while parsing multiple
+           files (like wrong compression or small file), just continue with the
+           other files in the folder
+
+    Debug and experimental options:
+    -v     verbose debug information, useful for verifying possible errors
+    -V     alternative verbose output, useful for programmers
+    -q     quiet, no *log output
+    -Q     very quiet, no output except the Print command
+    -L F   dump the offset/size/name of the files inside the file F
+    -x     use the hexadecimal notation in myitoa (debug)
+    -0     no extraction of files, useful for testing a script without using space
+    -R     needed for the programs that act as interface for QuickBMS
+    -a S   pass arguments to the input script that will take the names
+           quickbms_arg1, quickbms_arg2, quickbms_arg3 and so on, note that they
+           handled as arguments so pay attentions to spaces and commas, eg:
+             -a "arg1 \"arg 2\", arg3"
+             -a arg1 -a "\"arg 2\"" -a arg3
+    -H     cool HTML hex viewer output, use it only with very small files!
+    -X     cool hex viewer output on the console (support Less-like keys)
+    -9     toggle XDBG_ALLOC_ACTIVE  (enabled)
+    -8     toggle XDBG_ALLOC_INDEX   (enabled)
+    -7     toggle XDBG_ALLOC_VERBOSE (disabled)
+    -6     toggle XDBG_HEAPVALIDATE  (disabled)
+    -3     execute an INT3 before each CallDll, compression and encryption
+    -I     toggle variable names case sensitivity (case insensitive)
+    -M F   experimental compare and merge feature that allows to compare the
+           extracted files with those located in the folder F, currently this
+           experimental option will create files of 0 bytes if they are not
+           different, so it's not simple to identify what files were written
+
+    Features and security activation options:
+    -w     enable the write mode required to write physical input files with Put*
+    -C     enable the usage of CallDll without asking permission
+    -n     enable the usage of network sockets
+    -p     enable the usage of processes
+    -A     enable the usage of audio device
+    -g     enable the usage of video graphic device
+    -m     enable the usage of Windows messages
+    -G     force the GUI mode on Windows, it's automatically enabled if you
+           double-click on the QuickBMS executable
+
+
+Remember that the script and the input archive/folder are ever REQUIRED
+and they must be specified at the end of the command-line.
+
+The following is an example for listing all the mp3 files from the input
+archive:
+
+  quickbms -l -f "*.mp3" zip.bms myfile.zip
+  quickbms -l -f "{}.mp3;{}.ogg" zip.bms myfile.zip
+  quickbms -l -f "*.mp3;*.ogg,*filename*" zip.bms myfile.zip
+  quickbms -l -f file_containing_the_filters.txt zip.bms myfile.zip
+
+So -l for listing the files without extracting them, and -f for
+filtering the archived files. Regarding the -f and -F options it's worth
+to note that both * and {} are accepted as wildcards because the first
+pattern may be interpreted by the Windows console.
+
+QuickBMS supports also a folder as input which means that with a single
+command it's possible to unpack all the archives of a whole game
+directly using QuickBMS.
+
+Imagine to use the zip.bms script with all the zip files located in the
+Program Files folder:
+
+  quickbms -F "*.zip" zip.bms "c:\Program Files (x86)" c:\output_folder
+
+Note: as said before, sometimes Windows doesn't like the * char even if
+      used between quotes, so in case of problems with "*.zip" you can
+      use {} instead of *, for example "{}.zip"
+
+Except for -l, -f, -F and maybe -o and -s options, the others are
+intended for debugging, or they are special features or switches to
+enable/disabe some internals, so they should be ignored by the common
+users.
+
+If the extraction with a particular script is too slow or scanning a
+folder takes too much memory and time try using the -9 option that
+disables the memory protection.
+
+You can apply these options directly in a shortcut to quickbms.exe in
+the Target field of its properties, so you can use the double-click
+"GUI" method and all the command-line options you desire without
+using the command-line.
+
+In the same quickbms.zip package you should find
+also quickbms_4gb_files.exe (previously known as quickms64_test.exe)
+that is an "experimental" version that uses 64bit numbers instead of
+the original 32 bits:
+- it supports archives and files bigger than 4 gigabytes
+- it may have problems to work with "some" scripts
+- it's a native 32bit application so it works on both Windows 32 and 64
+- it's experimental and so not much supported, problems like crashes
+  and incorrect math operations can happen often in some scripts
+
+---
+
+Advanced users could find useful also these specific options:
+
+-d Automatically creates a folder with the name of the input file where
+   placing all the files, it's useful if you have many small archives
+   containing the same filenames and you need a way to separate the
+   extracted files without overwriting or renaming them.
+
+-E If you have a bms script that simply reads a file format, you can
+   change the endianess of all its numeric fields on the fly by simply
+   using this option.
+   For example if you have a "get SIZE long" a 32bit number will be
+   read as usual and additionally it will be reversed (0x11223344 to
+   0x44332211 or viceversa) and placed at the same location.
+   Remember that you need to specify also the -w option with physical
+   files, alternatively you can save the whole file in a memory file
+   and then dumping it so that -w is not necessary.
+   With this option is really trivial to convert the endianess of files
+   between different platforms, like Xbox 360 and PC.
+
+
+
+#######################################################################
+
+==================================
+3) Reimporting the extracted files
+==================================
+
+
+QuickBMS is mainly an extraction tool, but it supports also the -r
+option that converts the tool in a simple reimporter/reinjector and so
+it may be useful for modding or translating a game.
+
+The idea consists of being able to reimport ("injecting back") the
+modified files in the original archives without touching a single line
+of the script, just reusing the same bms scripts that already exist!
+
+
+-----------------------------------------------------------------------
+
+
+Using this feature is really trivial and the following is a
+step-by-step example:
+
+- Make a backup copy of the original archive!
+
+- Extract the files or only those you want to modify (-f option) as you
+  do normally via the GUI (double-click on quickbms.exe) OR via
+  command-line like the following example:
+
+    quickbms script.bms archive.pak output_folder
+
+- Modify the extracted files leaving their size unchanged or smaller
+  than before.
+  I suggest to delete the files that have not been modified so that the
+  reimporting process will be faster and safer. In the folder leave
+  only the files you modified.
+  Remember that their size must be smaller or equal than the original!
+
+- Reimport the files in the archive via the GUI by clicking on the
+  file called "reimport.bat" OR via command-line:
+
+    quickbms -w -r script.bms archive.pak output_folder
+
+- Test the game with the modified archive
+
+Remember that you can use the GUI for the reimporting procedure, just
+click on "reimport.bat" found in the quickbms package, it contains the
+command: quickbms.exe -G -w -r.
+
+
+-----------------------------------------------------------------------
+
+
+Another example:
+- First step, use QuickBMS as usual:
+
+  archive.pak -> file1.txt
+              -> file2.dat
+              -> file3.jpg
+
+- Second step:
+  - delete file1.txt and file2.dat
+  - modify file3.jpg, for example adding a "smile" in it
+  - save file3.jpg and be sure that it's size is SMALLER or EQUAL than
+    the original
+
+- Third step, use the reimport.bat file provided in quickbms and select
+  the SAME file and output folder you selected in the first step:
+
+  archive.pak <- file1.txt  (doesn't exist so it's not reimported)
+              <- file2.dat  (doesn't exist so it's not reimported)
+              <- file3.jpg  (successfully reimported)
+
+
+-----------------------------------------------------------------------
+
+
+Some important notes about this particular reimporting process:
+
+- you CANNOT increase the size of the files you want to reimport, so
+  the new files must be smaller or equal than the original ones.
+
+- the reimport process of compressed files may be slower in some cases,
+  for example with zlib, deflate, lzma and few others that are optimized
+  to use less space as possible at cost of CPU and time.
+
+- for the maximum compatibility within the thousands of available file
+  formats I decided to not use tricks for modifying the original
+  size and compressed_size values.
+  for example imagine those formats that use encrypted information
+  tables or MEMORY_FILEs for such tables or that use things like
+  "math SIZE *= 0x800".
+  the reimport process must be generic and without work-arounds.
+
+- the script is just the same for both extraction and reimporting, it
+  means that many of the scripts written by me and the other users
+  already work, cool!
+
+- the reimporting of compressed files is perfectly possible because
+  the tool automatically switches to the relative compression algorithm
+  if available (for example deflate -> deflate_compress), if an
+  algorithm is not available in recompress mode then the reimporting
+  will fail
+
+? if the original archive uses complex encryptions that require the
+  usage of MEMORY_FILEs to perform temporary decryption, then it's NOT
+  supported and the same is valid for chunked content (like those
+  scripts that use the command Append)
+  From version 0.6.6, QuickBMS has an experimental mode for reimporting
+  chunked files, it works very well with files saved directly to disk
+  and less well with those that use MEMORY_FILEs (most of my scripts).
+  In my opinion this feature is great but don't expect too much, with
+  some scripts you can have success but many others may not work.
+
+- FileXor, FileRot, Encryption and Filecrypt should work correctly
+
+- things like CRCs and hashes can't be supported
+
+- it's possible to reimport also the nameless files (log "" OFFSET SIZE)
+  the tool will automatically check for files in the folder with the
+  same number so if the file was saved as 00000014.xml it will be
+  reimported perfectly.
+
+- the reimport mode doesn't work if you renamed the files with the same
+  name during the extraction (for example using the 'r' choice), in
+  this case there is no way for the tool to know the correct file to
+  reimport and will reimport only the one with the same original name.
+
+
+Please note that often the games are able to load the extracted files
+directly from their installation folder, sometimes directly maybe by
+just removing the original archive and other times by launching the
+game with specific command-line arguments.
+The reimport feature of QuickBMS has already allowed to slightly mod
+and translate various games, but it's meant as a quick or temporary
+solution till a proper stand-alone rebuilder tool is written by the
+community of the target game, due to the better benefits coming from a
+complete and specific solution.
+But if nobody is going to write a stand-alone rebuilder for a specific
+game, then the reimport feature of QuickBMS is a great and immediately
+available solution.
+
+
+#######################################################################
+
+===============================================
+4) How to create scripts (for developers only!)
+===============================================
+
+
+Originally the tool was created just for myself to be able to write
+quick extractors for simple archives immediately without writing a new
+tool, but QuickBMS revealed to be a powerful tool that I use for many
+tasks, including the parsing of some protocols and much more.
+
+So, how to write these scripts?
+Well I guess that giving a look at http://wiki.xentax.com/index.php/BMS
+is a good first step to understand at least the basis of this language
+originally written by Mike Zuurman (alias Mr.Mouse of XeNTaX) in the
+far 1997.
+Then it's good to take a look at the various examples provided on
+http://quickbms.aluigi.org and http://zenhax.com
+
+A programming knowledge and background is not required but it's very
+useful for understanding the "logic" of the scripts and some terms.
+What is really necessary is the full knowledge of the format to
+implement: reverse engineering is ever useful for figuring the needed
+fields.
+
+Luckily in the extraction process it's not needed to know all the
+fields of an archive, so a field like a CRC doesn't matter while the
+important fields to extract a file are ever the following:
+
+- filename
+- offset
+- size
+- optional compressed size if the file is compressed
+
+If you don't have filename and size, it's not a problem. What's really
+necessary is knowing at least of the offsets of the files.
+If you check my scripts you can notice the name DUMMY assigned to the
+fields that are not useful for the extraction.
+
+Note that I will try to keep the following documentation updated as
+much as I can, and also in sync with what happens inside QuickBMS for
+each command.
+The source code of the tool is not easy to understand so I hope that
+this documentation may be useful and complete.
+
+The fields between [] are optional fields.
+
+---
+
+A quick and limited list of available commands is available when
+QuickBMS is launched with the -c option.
+The following are some important notes about the QuickBMS environment:
+
+- Everything is considered a variable except if it starts with a number
+  in which case it's considered a numeric constant, so when in this
+  document I talk about VAR, STRING and other types of data I refer
+  EVER to both variables and constants because they are EXACTLY the
+  SAME thing inside the tool.
+
+- All the commands and the names of the variables are case INsensitive
+  so "get OFFSET long" is the same as "GeT oFfSeT lOnG".
+
+- Everything works with signed 32 bit numbers (-2147483648 to
+  2147483647) so QuickBMS may not work well with files over 2 gigabytes
+  but it can seek on files of 4 gigabytes without problems.
+  Consider the following limits:
+  - max 4gb size for archives
+  - max 2gb size for the archived files
+  You can try quickbms_4gb_files.exe for working with bigger archives.
+
+- The constant strings depends by the context of the command, in fact
+  in some commands they are handled as strings in C notation like
+  "\x12\x34\\hello\"bye\0", in this case you must know how this
+  representation works.
+  This is a solution for using binary data inside the textual script.
+  The keyword is "C language escape characters" or escape sequences,
+  they are very simple, take a look here:
+  http://msdn.microsoft.com/en-us/library/h21280bw%28VS.80%29.aspx
+  http://www.acm.uiuc.edu/webmonkeys/book/c_guide/1.1.html
+  ONLY some commands support this C string notation for the escape
+  characters, a quick way to find them is searching the keyword
+  "(cstring)" without quotes in this document.
+
+- Both decimal and hexadecimal numbers are supported, hexadecimal is
+  adopted if the number starts with 0x so 1234 and 0x4d2 are the same.
+
+- Any operation made on fields bigger than 8 bits is controlled by the
+  global endianess, it means that any number and unicode field is
+  read in little endian by default otherwise it's valid the endianess
+  specified with the Endian command.
+
+- Comments can be used in C (// and /* */) and BMS syntax (#), for
+  example:
+    get DUMMY long  # this is a comment
+    /*
+    this is a comment
+    */
+
+- The FILENUM (file number) field in the commands is set as a constant,
+  it means that it cannot be modified at runtime using a variable,
+  examples:
+    get TMP string 0    # ok
+    get TMP string VAR  # wrong
+
+- All the commands use variables for their arguments except those in
+  which it's specified that a constant number or a string (STRING) is
+  needed. For example the commands that use a C string (cstring) use
+  constant strings and not variables, except some cases like the
+  dictionary of ComType.
+  Note that this behaviour may change in future or may have been
+  already changed in some commands.
+
+
+File numbers:
+  Every file opened in QuickBMS has a number assigned to it, if this
+  number is not specified it will be considered 0, the main input file.
+  The first opened file is the input archive to which is assigned the
+  number 0 (zero), the others must be opened with the Open command.
+  Negative numbers are considered MEMORY_FILEs, so -1 is MEMORY_FILE,
+  -2 MEMORY_FILE2 and so on.
+
+MEMORY_FILEs:
+  This is a particular type of temporary file which resides in memory
+  and works exactly like a normal temporary file.
+  It's extremely useful for doing many operations and you can use
+  multiple memory files: MEMORY_FILE, MEMORY_FILE2, MEMORY_FILE3 and so
+  on.
+  MEMORY_FILE and MEMORY_FILE1 are the same file.
+  .
+  If you need to work with chunked parts of a file to concatenate to
+  the memory file, you need to use the following trick:
+  .
+    putvarchr MEMORY_FILE FINAL_SIZE 0  # allocate memory internally in quickbms
+    log MEMORY_FILE 0 0                 # create the file
+  .
+  The first instruction allocates the memory for containing the final
+  size of your chunks, and the second one is necessary for resetting
+  the memory file (current offset and size, not the allocated size).
+  If you need to create a MEMORY_FILE of 0x100 bytes set to zero to
+  use in CallDLL use the following
+  .
+    log MEMORY_FILE 0 0                 # create the file
+    putvarchr MEMORY_FILE 0x100 0       # write 0x100+1 bytes set to zero
+
+TEMPORARY_FILE:
+  This additional file called TEMPORARY_FILE resides physically on the
+  target folder and has that exact name.
+  Although its "temporary" name, it's not deleted by the output folder
+  and QuickBMS will ask to remove it at the end of the extraction.
+  The file is created in any condition, even when it's used the -l (list)
+  option for listing the files, so it's perfect in certain situations
+  like when it's used a chunks based file system.
+  The difference with the MEMORY_FILE is only related to the amount of
+  memory available on the system because the previous file types uses
+  the RAM while this one uses the disk, so use it if you need to create
+  a temporary file bigger than 2 gigabytes.
+  .
+  For using the temporary file remember to use it like the following
+  example:
+  .
+    log TEMPORARY_FILE 0 0      # reset it in case it already exists (optional)
+    append                      # enables the append mode
+    ...
+        log TEMPORARY_FILE OFFSET SIZE
+    ...
+    append                      # disable the append mode
+    open "." TEMPORARY_FILE 1   # open the temporary file on the file number 1
+  .
+  Note that from version 0.6.8, QuickBMS automatically overwrites this
+  file if it already exists.
+
+
+The following is the list of types of variables supported, also know as
+datatypes or types.
+The list is ordered just like in defs.h:
+
+    BYTE            8 bit, 0 to 0xff
+
+    SHORT           16 bit (aka INT), 0 to 0xffff
+
+    THREEBYTE       24 bit, 0 to 0xffffff
+
+    LONG            32 bit, 0 to 0xffffffff
+
+    LONGLONG        fake 64 bit, so only 0 to 0xffffffff but Get takes 8 bytes
+
+    STRING          null delimited string (one byte for each char)
+
+    ASIZE           special type used to return the size of the opened file,
+                    used only with the GET command 
+
+    FILENAME        special type used to return the name of the opened file
+                    like "myfile.zip", used only with the GET command
+
+    BASENAME        special type used to return the base name of the opened
+                    file like "myfile", used only with the GET command
+
+    FILEPATH        the folder of the file, like "c:\path\folder" for
+                    "c:\path\folder\file.txt"
+
+    FULLBASENAME    just like FULLNAME without extension
+
+    EXTENSION       special type used to return the extension of the opened
+                    file like "zip", used only with the GET command
+
+    UNICODE         special type used for unicode utf16 strings, the
+                    endianess of the utf16 is the same used globally in the
+                    script (watch the Endian command), it's used also for
+                    converting an unicode string to an ascii one:
+                      Set ASCII_STRING UNICODE UNICODE_STRING
+
+                    unicode conversion is performed via Win32 API (CP_UTF8
+                    and CP_ACP in case of 0xfffd chars) while on Linux it
+                    uses iconv, fallback on mbtowc and byte=short
+
+    BINARY          special type used for binary strings in C notation like
+                    "\xff\x00\x12\x34", used mainly as a constant (cstring)
+
+    LINE            special type used for carriage return/line feed delimited
+                    string (so any string ending with a 0x00, 0x0a or 0x0d),
+                    from version 0.6 the tool supports also strings that
+                    have no delimiter at the end of file
+
+    FULLNAME        full path of the file, in reality at the moment it returns
+                    the same path used in the input filename
+
+    CURRENT_FOLDER  the path from which has been launched QuickBMS
+
+    FILE_FOLDER     the path of the loaded input file
+
+    OUTPUT_FOLDER   the extraction folder (the last argument of QuickBMS)
+
+    INPUT_FOLDER    same as above
+
+    BMS_FOLDER  the folder where is located the bms script
+
+    ALLOC           a type used only in the Set command for creating a variable
+                    with a specific allocated size
+
+    COMPRESSED      a special type used for setting big strings and memory
+                    files using a small amount of text, for using this type
+                    you must take the original text/file, compress it with
+                    zlib (you can use my packzip tool) and then encoding the
+                    output file with base64 (you can use my bde64 tool) and
+                    placing the result like the following:
+                      set MEMORY_FILE compressed eNrtwbEJACAMBMBecIfvnMUxPuEJAe0UHN81LLzrbYKwDOjI96IN1cLveRfAGqYu
+                    this type is very useful if you want to embed a dll inside
+                    a script without wasting much space
+
+                    You can create this variable using the following script:
+                      http://aluigi.org/bms/file_compressed_var.bms
+
+    FLOAT           32 bit, 123.345 is read as 123
+
+    DOUBLE          64 bit, 123.345 is read as 123
+
+    LONGDOUBLE      96 bit, 123.345 is read as 123
+
+    VARIABLE        read byte per byte till the byte is negative
+
+    VARIABLE2       Unreal engine index numbers
+
+    VARIANT         VB/C++ variant type (http://en.wikipedia.org/wiki/Variant_type)
+
+    BITS            read a specific amount of bits, QuickBMS and the
+                    language are byte based but the "bits" method works
+                    very well
+
+    TIME            time_t Unix 32bit time
+
+    TIME64          64bit time used as FILETIME on Windows
+
+    CLSID           ClassID like 00000000-0000-0001-0000-000000000000
+
+    IPV4            7f 00 00 01 = "127.0.0.1"
+
+    IPV6            like 2001:0db8:85a3:0000:0000:8a2e:0370:7334
+
+    ASM             x86 assembly
+
+    VARIABLE3       used in various software
+
+    SIGNED_BYTE     0x99 is read as 0xffffff99
+
+    SIGNED_SHORT    0x9999 is read as 0xffff9999
+
+    SIGNED_THREEBYTE
+
+    SIGNED_LONG     mainly useful in quickbms_4gb_files:
+                    0x99999999 is read as 0xffffffff0x99999999
+
+    VARIABLE4       used in Battlefield 3 (Frostbite engine)
+
+    VARIABLE5       used in 7z archives
+
+    UNKNOWN         use it to ask the user to insert the content of the variable
+
+Just for the record, the original MexScript probably contained some
+types of variables that have never been used and for which it's unknown
+what they should represent: PURETEXT, PURENUMBER, TEXTORNUMBER and
+FILENUMBER.
+
+QuickBMS supports also the "experimental" multidimensional arrays
+inside the variables, for example:
+
+    for i = 0 < 10
+        get VAR[i] long
+        for j = 0 < 5
+            get VAR2[i][j] long
+        next j
+    next i
+
+But it's possible to access that variable ONLY by specifying the
+original name and index, so:
+
+    print "%VAR[0]%"    # fail!
+
+    math i = 0
+    print "%VAR[i]%"    # ok
+
+
+The following is the list of bms commands:
+
+
+.......................................................................
+
+QuickBMSver VERSION
+
+    Checks if the current version of QuickBMS is enough recent to
+    support the script. It's used rarely, mainly for scripts created
+    after the introduction of a new feature or an important fix.
+
+    Arguments:
+      VERSION   Oldest version of QuickBMS for which was created the script,
+                it's just the version displayed at runtime by the tool.
+                It's also possible to add some options that are suggested
+                by the script to the user for enabling them at runtime,
+                currently are supported:
+                  -9  disable the safe memory allocator
+                  -I  makes the variables case sensitive
+                  -64 checks if the user is running quickbms_4gb_files.exe
+
+    Examples:
+      QuickBMSver 0.2.4
+      QuickBMSver "0.5.14 -9"
+      QuickBMSver "-I -9"
+
+
+.......................................................................
+
+FindLoc VAR TYPE STRING [FILENUM] [ERR_VALUE]
+
+    It finds the first occurrence of a given string or number from the
+    current offset of the archive, just by scanning it byte per byte.
+    It's used in those cases when the format of the archive is not known
+    or it's a particular text file.
+
+    Arguments:
+      VAR       The variable which will receive the offset of the occurrence
+      TYPE      Type of the data we want to search, currently supported:
+                - string and binary, they are handled as the same
+                - unicode, the search will be performed as utf16 with the
+                  data stored using the current endianess
+                - numeric type (byte, short, long ...), you will search a
+                  number stored using the current global endianess
+      STRING    This value must be a number if TYPE is a numeric type,
+                otherwise it must be a string in C notation (cstring)
+      FILENUM   Number of the file associated to the archive (0)
+      ERR_VALUE By default FindLoc terminates the script if no string
+                is found but if ERR_VALUE is specified this value will
+                be assigned to this value without terminating when there are
+                no other occurrences, the best usage is ERR_VALUE set to ""
+
+    Examples:
+      For
+          FindLoc OFFSET string "filename="
+          ...
+          FindLoc OFFSET string "filename=" 0 ""
+          if OFFSET == ""
+              cleanexit
+          endif
+      Next
+
+
+.......................................................................
+
+For [VAR] [OP] [VALUE] [COND] [VAR]
+...
+Next [VAR] [OP] [VALUE]
+
+    A classical "for" loop with initializers, conditions and
+    incrementers.
+    There is also the Break instruction available to break the loop at
+    any moment but note that it's not suggested in presence of multiple
+    For because in some rare cases it may not work correctly.
+    "For" allows to perform an initial operation on a variable and to
+    perform a check in each cycle to ensure a particular condition.
+    "Next" is the command which delimits the loop and at the same time
+    increments the given variable if specified.
+    It's also possible to use a math operation in Next so that you can
+    increment, decrement or perform any other operation at the end of
+    each cycle.
+    All the parameters are optionals and must be inserted in the
+    specific order, so if there is no initialization you must use
+    something like the following:
+      For OFFSET = OFFSET < 1000
+    For the record, there is also a "Prev" variant of the Next command,
+    it performs the decrement of the variable.
+
+    Arguments:
+      VAR       Variable on which is performed the first math operation
+                and is checked for the condition
+      OP        Any of the available Math operators (check Math)
+      VALUE     Value to assign to the variable or part of the math operation
+      COND      Condition (check the If command)
+      VAR       Second part of the condition
+
+    Examples:
+      For i = 0 < FILES
+          ...
+      next i
+      For
+         # do what you want here, this is an endless loop
+      Next
+      For VAR1 = VAR1 != VAR2
+         # this is exactly the same of using while(VAR1 != VAR2) {...} in C
+      Next VAR2 /= 3
+      For OFFSET = OFFSET != ARCHIVE_SIZE
+        ...
+        Savepos OFFSET
+        if OFFSET > 100
+          break
+        endif
+      Next
+
+
+.......................................................................
+
+Get VAR TYPE [FILENUM]
+
+    It reads strings and numbers from the file, it's also the most used
+    command.
+    It supports many types of input and are the same already seen at the
+    beginning of this section of the documentation like byte, short, long,
+    string, unicode and so on.
+    The tool automatically terminates when there is no data or partial
+    data to read at the end of the file.
+
+    Arguments:
+      VAR       Variable which will receive the read data
+      TYPE      Check the description of the types explained before
+      FILENUM   Number of the file associated to the archive (0)
+
+    Examples:
+      Get OFFSET long
+      Get NAME string
+
+
+.......................................................................
+
+GetDString VAR LENGTH [FILENUM]
+
+    It reads a defined amount of data from the file and stores it in the
+    given variable.
+    It's useful with filenames and other strings that have a length
+    specified in a previous 8, 16 or 32 bit field.
+
+    Arguments:
+      VAR       Variable which will receive the read data
+      LENGTH    Amount of bytes to read.
+                There is also an experimental method in which you can
+                specify the elements and the size of each element like
+                LENGTH*NUM, for example:
+                  getdstring ARRAY NUMBERS*4
+      FILENUM   Number of the file associated to the archive (0)
+
+    Examples:
+      GetDString NAME NAME_LENGTH
+      GetDString NAME 0x100
+      getdstring ARRAY ELEMENTS*4
+
+
+.......................................................................
+
+GoTo OFFSET [FILENUM] [TYPE]
+
+    It changes the current position in the file, just like fseek in C.
+
+    Arguments:
+      OFFSET    Position to reach.
+                The offset "SEEK_SET" is offset 0.
+                The offset "SEEK_END" is the end of file.
+                If it's a constant negative it will be considered
+                the amount of bytes from the end of the file, so
+                a negative variable is just considered as unsigned
+                32bit.
+                The offset depends also by the TYPE field.
+      FILENUM   number of the file associated to the archive (0)
+      TYPE      - SEEK_SET, the absolute offset (default)
+                - SEEK_CUR, the relative offset from the current position
+                - SEEK_END, the amount of bytes from the end, must be
+                  negative or OFFSET will be converted to negative
+
+    Examples:
+      GoTo OFFSET
+      GoTo 0x100
+      GoTo -4           # 4 bytes before the end of the file
+      GoTo SEEK_SET     # like goto 0
+      Goto SEEK_END     # like goto 0 0 SEEK_END
+
+
+.......................................................................
+
+IDString [FILENUM] STRING
+
+    It terminates the program if the magic/signature at the current
+    position of the file differs than the provided string.
+    If the string doesn't match and it's 4 bytes long QuickBMS will
+    automatically swap it and perform the comparison again, if this time
+    it matches then the endianess will be changed making most of the
+    scripts written for an architecture (for example PC) virtually
+    compatible with others (for example Xbox360).
+    Pay attention to the FILENUM/VAR order different than other commands
+    (it's a fault of the original BMS syntax), anyway QuickBMS will try
+    to fix the order in case you invert them.
+
+    Arguments
+      FILENUM   number of the file associated to the archive (0)
+      STRING    string in C notation (cstring)
+
+    Examples:
+      IDString "PK\x03\x04"
+      IDString " KAP"
+      IDString MEMORY_FILE "hello"
+      IDString "hello" MEMORY_FILE  # it works too
+
+
+.......................................................................
+
+Log NAME OFFSET SIZE [FILENUM] [XSIZE]
+
+    It extracts the file, this operation doesn't affect the current
+    position of the input file.
+    The content of the extracted file can be decrypted automatically
+    using the Encryption command.
+    If NAME is set to an empty string like "", QuickBMS will assign a
+    sequential hexadecimal value and will try to guess the extension
+    based on the content of the file.
+    The extension will be automatically guesses and appended also to
+    all the files that terminate with a dot or an asterisk like ".",
+    "*" or ".*" or if they point to folders like "folder/".
+    NAME can be also a special file like those that will be seen later,
+    for example a socket, a process, an audio device and so on (in
+    this case the user must have authorized the usage of the special
+    files via command-line for using them).
+    The filename will be automatically cleaned for dumping the file
+    without problems.
+    NAME can be also a MEMORY_FILE or a TEMPORARY_FILE.
+    If a file with the same name already exists, QuickBMS will ask
+    what action to take, the suggested one is the 'r' choice that
+    will allow to automatically rename all the files with the same
+    name without overwriting them.
+    If you have used the Append command, the data will be appended to
+    the existent file with the same name.
+    Log and Clog share the same code, so the compression is the only
+    difference.
+
+    Arguments:
+      NAME      Name of the output file
+      OFFSET    Position in the archive where is located the file
+      SIZE      Amount of the data to extract
+      FILENUM   Number of the file associated to the archive (0)
+      XSIZE     Used with block encryptions, this value is the aligned
+                amount of data read from the disk, example for AES:
+                   log NAME OFFSET 0x123      0 0x130
+                  clog NAME OFFSET 0x123 SIZE 0 0x130
+
+    Examples:
+      Log NAME OFFSET SIZE
+      Log "dump.dat" 0 SIZE
+      Log "" 0 SIZE
+      Log "folder/name.*" 0 SIZE
+
+
+.......................................................................
+
+Clog NAME OFFSET ZSIZE SIZE [FILENUM] [XSIZE]
+
+    It extracts the file by decompressing it in real-time, this
+    operation doesn't affect the current position of the input file.
+    The decompression algorithm used in the operation is decided by the
+    ComType command (zlib by default).
+    The content of the extracted file can be decrypted automatically
+    using the Encryption command.
+    For additional information please refer to the Log command.
+
+    Arguments:
+      NAME      Name of the output file
+      OFFSET    Position of the archive where is located the file
+      ZSIZE     Size of the compressed data in the archive
+      SIZE      Size of the uncompressed file, if you have specified
+                a "_compress" algorithm you can use SIZE equal to ZSIZE
+                because the tool will automatically calculate the
+                maximum amount of bytes taken for the compression
+      FILENUM   Number of the file associated to the archive (0)
+      XSIZE     Used with block encryptions like AES, just like Log
+
+    Examples:
+      Clog NAME OFFSET ZSIZE SIZE
+      Clog "dump.dat" 0 ZSIZE 10000000 # with some compression algorithms
+                                       # the file will have the real size
+                                       # while others will set it to 10000000
+
+
+.......................................................................
+
+Math VAR OP VAR
+
+    Mathematical operation between the two variables with the result
+    placed in the first one.
+    Note that due to compatibility all the operations are performed using
+    signed 32 bit numbers by default.
+    This makes the difference with some operation like the shift or the
+    divisions, so pay attention!
+    For unsigned operations add an 'u' before OP.
+    The additional '=' you see in many scripts and in the examples is not
+    needed, programmers are used to add it when the first variable is both
+    input and output, like in C: var += 123;.
+
+    Arguments
+      VAR       Variable which acts as input and output
+      OP        +   sum
+                *   multiplication
+                /   division
+                -   substraction
+                ^   xor
+                &   and
+                |   or
+                %   modulus
+                !   negation of var2 (0 becomes 1 and any other value becomes 0)
+                ~   complement of var2 (like "xor 0xffffffff")
+                <   shift left (also <<)
+                >   shift right (also >>)
+                l   rotate left (also <<<)
+                r   rotate right (also >>>)
+                s   byte swapping, 2 for reverseshort and 4 for reverselong
+                w   bit swapping, reverse the amount of bits specified in var2
+                =   assign var2 to var1
+                n   negative value of var2 (like var1 = -var2)
+                a   absolute value of var2 (-10 = 10 and 10 = 10)
+                v   radix (also //)
+                p   power (also **)
+                x   alignment/padding, examples:
+                    var1=0   var2=16  result=0
+                    var1=1   var2=16  result=16
+                    var1=16  var2=16  result=16
+                    var1=17  var2=16  result=32
+                y   round, like var1=(var1/var2)*var2, examples:
+                    var1=0   var2=16  result=0
+                    var1=1   var2=16  result=0
+                    var1=16  var2=16  result=16
+                    var1=17  var2=16  result=16
+                z   common bitswapping (also <>):
+                    var1=0xab    var2=4  result=0xba
+                    var1=0xabcd  var2=4  result=0xdc
+                    var1=0xabcd  var2=8  result=0xcdab
+                reverselong     swap of 32bit variable
+                reverseshort    swap of 16bit variable
+                reverselonglong swap of 64bit variable
+                binary  convert from binary to decimal
+                octal   convert from octal to decimal
+                hex     convert from hexadecimal to decimal (this is automatic,
+                        use it only if VAR2 doesn't have a 0x prefix)
+                base*   convert from base* to decimal, so base8 is octal, base2
+                        is binary, base16 is hex and so on
+                Add a 'u' before or after OP for forcing the usage of unsigned
+                operations useful with shift, divisions and possibly other
+                operations.
+                Any operation starting with a '?' will be considered a
+                verbose operator, for example ?add is the same of +.
+                QuickBMS supports also all the functions available in
+                math.h like ?sin, ?cos, ?atan and so on. Unfortunately it's not
+                possible to list them here, please check math_operations() and
+                old_set_math_operator() in cmd.c.
+      VAR       Other input variable
+
+    Examples:
+      Math SIZE * 0x100
+      Math OFFSET << 2
+      Math OFFSET u<< 2
+      Math TMP = SIZE
+      Math TMP ~ TMP
+      Math TMP n TMP
+      Math TMP2 a TMP
+      Math SIZE u/ 5
+      Math RADIX v 2
+
+
+.......................................................................
+
+XMath VAR INSTR
+
+    Multiple mathematical operations in one line, just a way to avoid
+    the limitations of the original Math command.
+    Currently this command is just an experiment and supports only the
+    most simple operators named with a non-alphanumeric character and
+    applied to unsigned numbers:
+        ~ ! < > & ^ | * / % - +
+        <<< shift left
+        >>> shift right
+        **  power
+        //  root
+        &&  alignment
+        <>  common bit swapping
+        %%  percentage ("VAR %% 15" will return the 15% of VAR)
+    This command is directly derived from my calcc tool:
+      http://aluigi.org/mytoolz.htm#calcc
+    Please note that XMath is a lot slower than Math.
+    Do NOT use the unsigned labels or the additional '=' you use with the
+    Math command because they are NOT supported since all operations
+    are unsigned in XMath, so:
+      xmath TMP "TMP u<<= 5"    is WRONG
+      xmath TMP "TMP << 5"      is CORRECT
+
+    Arguments
+      VAR       Variable that acts as output
+      INSTR     The full instruction
+
+    Examples:
+        XMath VAR "1 + 2 - ((3 + 4) + VAR * VAR2)"
+
+
+.......................................................................
+
+Open FOLDER NAME [FILENUM] [EXISTS]
+
+    It opens a file, basically it assigns a file number/id to an existent
+    file that you want to use.
+    If NAME is '?':
+    - and FOLDER is FDDE the user must type the extension of the file to load,
+      the name is the same of the one currently open
+    - and FOLDER is FDSE the user must type the name of the file loaded from
+      the same folder
+    - the user must type the full name of the file to load
+
+    Arguments:
+      FOLDER    FDDE, means that you want to open the file in the same
+                  location of the input one which has the extension
+                  provided with NAME, so FDDE is for the extension only
+                FDSE, it will consider NAME as a file located in the
+                  same folder of the input file (very useful)
+                any other value is considered the folder where is located
+                  the file to load so use "." for the current output
+                  folder
+      NAME      Read above, NAME can be also a ? in which case QuickBMS
+                will ask the user to insert the name of the file to open
+                manually
+                if NAME is "" then will be performed a flush operation
+                that could be useful (or not?) only in write mode (debug)
+      FILENUM   Number of the file associated to the archive (0)
+      EXISTS    If the file doesn't exist this variable will be set to
+                0 or 1 if it exists. by default QuickBMS terminates
+                with an error if the file doesn't exist.
+
+    Examples:
+      Open FDDE DAT 0
+      Open FDDE IDX 1
+      Open FDSE "myfile.zip"
+      Open "." TEMPORARY_FILE 1
+
+
+.......................................................................
+
+SavePos VAR [FILENUM]
+
+    Current position of the file, like ftell in C.
+
+    Arguments:
+      VAR       Variable which will contain the offset
+      FILENUM   Number of the file associated to the archive (0)
+
+    Examples:
+      SavePos OFFSET
+
+
+.......................................................................
+
+Set VAR [TYPE] VAR
+
+    Command for assigning a constant or a variable to another variable
+    with the possibility of changing its type, utf8 to unicode and vice
+    versa.
+
+    Arguments:
+      VAR       Output variable or memory file
+      TYPE      In general the type is not much important because in
+                QuickBMS there is almost no difference between numbers
+                and strings, anyway the following are the special types:
+                - unicode, unicode to utf8, endian dependent
+                    set NAME unicode NAME
+                - to_unicode, utf8 to unicode, endian dependent
+                    set NAME to_unicode NAME
+                - binary, C notation (cstring)
+                    set MEMORY_FILE binary "\x11\x22\x00hello"
+                - alloc: allocates memory, something like putvarchr VAR SIZE 0
+                    set VAR alloc 0x1234
+                - filename: takes the filename part from a string (myfile.txt)
+                    set NAME filename "c:\folder\myfile.txt"
+                - basename: takes the basename part from a string (myfile)
+                - extension: takes the extension part from a string (txt)
+                - unknown: the user is asked to insert the content of the variable
+                    set VAR ? ?
+                - strlen: just a wrapper for the Strlen command
+                    set NAMESZ strlen NAME
+      VAR       Variable or constant to assign
+
+    Examples:
+      Set i long 0
+      Set TMP long SIZE
+      Set TMPNAME NAME
+      Set MEMORY_FILE binary "\x12\x34\x56\x78"
+      Set ASCII_VAR unicode UNICODE_VAR # from unicode to string
+      Set VAR ? ?   # the user will be prompted to insert his content
+
+
+.......................................................................
+
+Do
+...
+While VAR COND VAR
+
+    A not so useful type of cycle where the check of the condition is
+    performed at the end of the cycle... really rarely used.
+    If you need a C-like "while(...) {...}" use the For command.
+
+    Arguments:
+      VAR       first part of the condition
+      COND      condition, check the If command below for additional info
+      VAR       second part of the condition
+
+    Examples:
+      Do
+          ...
+      While OFFSET < MAX_OFFSET
+
+
+.......................................................................
+
+String VAR OP VAR
+
+    The equivalent of the Math command for the strings.
+    The first variable can be an input and output or only an output
+    depending by the operator.
+    You can use also a textual OP, this value is the one in the first
+    line of the operator you see below (for example "equal" is '=').
+    The string searching operators are quite confusing because the tool
+    didn't have this feature and they were implemented in the String
+    command later as experimental features.
+
+    Arguments:
+      VAR       Input and output variable
+      OP        =   equal, copy
+                    just a copy, but if var2 is a number it will be
+                    considered a raw string, very useful for Long to
+                    String conversions:
+                      var2="0x44434241", result="ABCD"
+                +   append, add
+                    append the second string to the first one
+                -   truncate, remove
+                    if the second variable is a positive number the
+                      string will be truncated at that amount of bytes
+                      from the end: var1[len1 - num] = 0;
+                    if the second variable is a negative number the
+                      string will be truncated at that amount of bytes
+                      from the beginning: var1[num] = 0;
+                    otherwise will be removed all the occurrences of
+                    the second string in the variable
+                ^   xor
+                    xor the first string with the second one (looped if shorter)
+                <   shl, shift_left
+                    like strrchr/strrstr returning the part before it plus
+                    the searched string:
+                      var1="thisisastring", var2="is", result="thisis"
+                    instead if it's a number will move the string of those
+                    positions:
+                      var1="thisisastring", var2="4",  result="isastring"
+                      var1="thisisastring", var2="-4", result="ring"
+                *   mul, replicate
+                    replicate the string for the number of times specified by the
+                    second variable
+                      var1="hello", var2=5, result:"hellohellohellohellohello"
+                    if it's a string it acts as strchr/strstr returning the part
+                    before it plus the searched string:
+                      var1="thisisastring", var2="is", result="this"
+                %   mod
+                    if the second variable is a positive number
+                      cut the variable at the position obtained by the modulus
+                      of its length and the number in the second variable
+                    while if it'a string it acts like strchr/strstr returning
+                    the data before the result
+                      var1="thisisastring", var2="is", result="th"
+                &   strchr, strstr
+                    first occurrence
+                      var1="thisisastring", var2="isa", result="isastring"
+                |   strchrx, strstrx
+                    first occurrence + var2 length
+                      var1="thisisastring", var2="isa", result="string"
+                $   strrchr, strrstr
+                    last occurrence plus searched string
+                      var1="thisisastring", var2="isa", result="isastring"
+                !   strrchrx, strrstrx
+                    last occurrence + var2 length
+                      var1="thisisastring", var2="isa", result="string"
+                >   shr, shift_right
+                    if the second variable is a number:
+                      var1="thisisastring", var2="4", result="thisisast"
+                    otherwise the string is searched from the END of the variable
+                    just like strrchr/strrstr returning the part before
+                    the searched string:
+                      var1="thisisastring", var2="isa", result="this"
+                r   reverse
+                    reversed string, "abcd" -> "dcba"
+                b   byte2hex
+                    byte2hex of var2: var2="abc", result="616263"
+                B   byte2hex_string
+                    as above but uses the var2 as a null delimited string (strlen)
+                h   hex2byte
+                    hex2byte of var2: var2="616263", result="abc"
+                e   encrypt, encryption
+                    experimental encryption based on the Encryption command
+                E   encrypt_string
+                    as above but uses var2 as a null delimited string (strlen)
+                c   compress, compression, comtype
+                    experimental compression based on the ComType command
+                C   compress_string
+                    as above but uses var2 as a null delimited string (strlen)
+                u   toupper
+                    var2="hello", result="HELLO"
+                l   tolower
+                    var2="HELLO", result="hello"
+                R   replace
+                    replace chars: var1="helloworld", var2="world", var3="me", result="hellome"
+                p   printf, sprintf
+                    a printf-like experimental work-around
+                    the format for float (f) and double (g) works only
+                    for one element, so:
+                      get VAR_LONG long
+                      String TMP p "%10.10f" VAR_LONG # no VAR2 or VAR3
+                      print "%TMP%"
+                P   QuickBMS Print
+                    same output of the Print command, for example:
+                      string VAR P "hello %VAR1% test %VAR2|x%"
+                s   sscanf
+                    a sscanf-like experimental work-around, only for numeric 32bit values
+                      string "123:456" s "%d:%d" VAR1 VAR2
+                S   split
+                    it's like a sscanf for strings, both ' and " are handled as
+                    quotes.
+                    string ELEMENTS S "string1 \"string 2\" 'string3'" VAR1 VAR2 VAR3
+                x   cstring
+                    convert a C string (cstring) to the relative string/binary
+                      string VAR x \x78\x7a
+                f   filter
+                    filter the non alphanumeric chars by replacing them with '_'
+                m   math, xmath
+                    math and xmath operation just like those in the Encryption command
+                    so #INPUT#+1 means that 0x01 will be added to each char of VAR
+                    quick example:  string VAR m "#INPUT#+1"    # xmath if there is INPUT
+                                    string VAR m "+ 1"          # math
+                w   hex2uri
+                    var2="%2fhello", result="/hello"
+                W   uri2hex
+                    var2="hello<>", result="hello%3c%3e"
+                t   very basic html/xml tags remover, de_html
+                T   html/xml formatter, one tag or text per line, easy_html
+                Use an additional zero ("0") to return "" in case of errors like when
+                the operators that search strings can't find the pattern (in which case
+                will be returned the original string by default), this is very useful
+                while playing with strings, for example
+                "string VAR1 0strchr VAR2" will return "" if VAR2 is not found in VAR1
+                (instead of leaving VAR1 unchanged), another example: String VAR1 0$ VAR2
+      VAR       The second variable or string
+
+    Examples:
+      string FULLPATH + NAME
+      string FULLPATH + \
+      string NAME - ".zip"
+      string NAME - 4
+      string PATH R "." "/"
+      string FULLPATH p "c:\folder\%04x%04x.dat" VAR1 VAR2     # VAR1/2 are the input
+      string FULLPATH s "c:\folder\%04x%04x.dat" VAR1 VAR2     # VAR1/2 are the output
+
+
+.......................................................................
+
+CleanExit
+
+    Terminates the script, it's possible also to use just Exit.
+
+
+.......................................................................
+
+If VAR COND VAR [...]
+...
+[Elif VAR COND VAR]
+...
+[Else]
+...
+EndIf
+
+    It checks various conditions and performs the needed operation when
+    the condition is verified, in short:
+    - If is ever the first condition
+    - Elif is another condition and can be used endless times
+    - Else is the operation to do when no conditions are met, the last one
+    - EndIf delimits the If command statement
+    It's also possible to use multiple conditions (max 3 or 4) like:
+      if VAR1 < VAR2 && VAR3 > VAR4
+      elif VAR1 != 0 || VAR2 != 0
+    The 'u' added before the condition forces an unsigned comparison
+    with numbers and a case sensitive comparison with strings.
+    The condition is considered for both strings and numbers, for more
+    technical details it's necessary to check the check_condition()
+    function in the cmd.c source code.
+
+    Arguments:
+      VAR       First part of the condition
+      COND      Valid for both strings and numbers:
+                <   minor, lower, below
+                >   major, greater, above
+                !=  different, <> !==
+                ==  equal, = === strcmp stricmp strcasecmp
+                >=  major/equal
+                <=  minor/equal
+                &   string: var2 is included in var1 (strstr)
+                    number: logical AND
+                ^   string: equal
+                    number: logical XOR
+                |   number: logical OR
+                %   number: modulus
+                /   number: division
+                <<  number: shift left
+                >>  number: shift right
+                !   number: negation, not
+                !!  number: true, use it to know if VAR is non-zero
+                ~   number: complement
+                strncmp     if "mystring" strncmp "myst"
+                ext compares the string after the last dot
+                basename    compares the string before the last dot
+                filepath    compares the part before the filenames, you
+                            can force a folder without filename by appending
+                            a slash: "c:\folder/" instead of "c:\folder" (that will be "c:")
+                any other operation supported by the Math command (valid
+                  only for the numeric variables)
+                add a 'u' before COND for forcing the usage of unsigned
+                operations useful with shift, divisions and possibly other
+                operations, if the variables are strings then it will
+                perform an case sensitive comparison instead of the default
+                insensitive one
+      VAR       Second part of the condition
+
+    Examples:
+      If NAME != ""
+          ...
+      Endif
+      If MASK & 1
+      Elif MASK & 2
+      Elif MASK & 4
+      Elif MASK & 8
+      Else
+      Endif
+
+
+.......................................................................
+
+GetCT VAR TYPE CHAR [FILENUM]
+
+    It reads a string till the reaching of the CHAR delimiter.
+
+    arguments
+      VAR       Output variable
+      TYPE      Only unicode is the alternative type, any other value
+                is just ignored because doesn't matter for this
+                operation
+      CHAR      The delimiter character as 8bit number, if this number
+                is negative QuickBMS will convert it to positive and
+                read till the current byte is the same (so it's like
+                a way to skip the same byte in a file)
+      FILENUM   Number of the file associated to the archive (0)
+
+    Examples:
+      GetCT NAME string 0x0a
+      GetCT NAME string 0x3b
+      set DELIMITER_BYTE long 0x0a
+      GetCT NAME string DELIMITER_BYTE
+      GetCT NAME unicode 0x0a
+
+
+.......................................................................
+
+ComType ALGO [DICT] [DICT_SIZE]
+
+    It selects a specific compression algorithm to use with the Clog
+    command.
+    It's also possible to choose a number as ALGO, this is a feature
+    coming from my project for a compression scanner able to guess
+    the possible algorithm of an unknown compressed data block:
+      http://aluigi.org/bms/comtype_scan2.bat
+      http://aluigi.org/bms/comtype_scan2.bms
+      comtype_scan2.bat comtype_scan2.bms input_file output_folder
+      comtype_scan2.bat comtype_scan2.bms input_file output_folder uncompressed_size
+    Note that some algorithms may work only on Windows.
+    if ALGO is "?", the user is prompted to type the desired algorithm.
+
+    Arguments:
+      ALGO      copy, simple copy that useful in some rare cases with
+                  data encrypted with block ciphers like AES and blowfish
+                  so use comtype copy and encryption
+                zlib, RFC1950 (aka windowbit 15, the data starts with a 'x')
+                  DICT supported
+                  if DICT starts with "Z_FULL_FLUSH" inflate/deflate will use Z_FULL_FLUSH
+                deflate, RFC1951 (aka windowbit -15) used for example in the ZIP files
+                  DICT supported
+                  if DICT starts with "Z_FULL_FLUSH" inflate/deflate will use Z_FULL_FLUSH
+                lzo1a till lzo2a, LZO (remember that the most used is lzo1x)
+                  DICT supported
+                lzss, with default configuration (dictionary of 4096 bytes)
+                  this particular algorithm can be fully configured setting the
+                  EI, EJ and P fields plus another number rarely used:
+                    EI, EJ, P, rless, init_chr
+                  for setting them it's enough to use a DICT equal to something
+                  like "12 4 2" which means EI:12 (N:4096), EJ:4 (F:18), P:2
+                  use a negative init_chr for different window slide customizations
+                  like -1 for Tales of Vesperia
+                  the default character of lzss is a space (0x20), but you can use the
+                  ALGO lzss0 or the dictionary "12 4 2 2 0" to use 0x00
+                lzx, used by the old (aka jurassic) unlzx tool and on Amiga
+                gzip, automatic handling of the gzip data
+                  remember that in this case the uncompressed size is
+                  ignored and calculated automatically so in CLog use
+                  ZSIZE ZSIZE
+                pkware, the algorithm also known as blast/explode/implode/DCL
+                lzma, 5 bytes + lzma (in some cases you may need to use ZSIZE + 5)
+                lzma86head, 5 bytes + 8 bytes (size) + lzma
+                lzma86dec, 1 byte + 5 bytes + lzma (in some cases you may need to use ZSIZE + 5)
+                lzma86dechead, 1 byte + 5 bytes + 8 bytes (size) + lzma
+                lzmaefs, the format implemented in ZIP
+                bzip2
+                XMemDecompress, (aka xmemlzx) Xbox 360 LZX algorithm of xcompress.lib
+                  use DICT to specify a custom WindowSize and CompressionPartitionSize
+                  like "131072 524288"
+                  the algorithm automatically idenfities and extracts the LZXTDECODE
+                  and LZXNATIVE files generated by xbcompress.exe (0x0FF512ED / 0x0FF512EE)
+                hex, from "01234567" to 4 bytes: 0x01 0x23 0x45 0x67
+                base64, from "aGVsbG8=" to "hello", supports also the Gamespy
+                  and URL chars
+                uudecode
+                ascii85
+                yenc
+                COM_LZW_Decompress, used in Vietcong
+                milestone_lzw, the lzw algorithm used in the Milestone games
+                lzxcab, lzx algorithm used to handle the cab files (libmspack 21 0)
+                lzxchm, lzx algorithm used to handle the chm files (libmspack 16 2)
+                rlew, 16 bit RLE algorithm used in AIM Racing
+                lzjb, a compression used in a file system for *nix
+                sfl_block, expand_block from iMatix Standard Function Library
+                sfl_rle, expand_rle from iMatix Standard Function Library
+                sfl_nulls, expand_nulls from iMatix Standard Function Library
+                sfl_bits, expand_bits from iMatix Standard Function Library
+                lzma2, 1 bytes + lzma2
+                lzma2_86head, 1 bytes + 8 bytes (size) + lzma2
+                lzma2_86dec, 1 byte + 1 bytes + lzma2
+                lzma2_86dechead, 1 byte + 1 bytes + 8 bytes (size) + lzma2
+                nrv2b, UCL
+                nrv2d, UCL
+                nrv2e, UCL
+                huffboh, an unrecognized compression used in the Asura engine
+                uncompress, the lzw algorithm used in the compress utility
+                  (the lzw data starts from offset 3 of the .Z files)
+                dmc, Dynamic Markov Compression (DMC)
+                lzhuf, aka LZH/LHA
+                lzari
+                rle7
+                rle0
+                rle
+                rlea, another generic rle decompressor
+                  use DICT to choose the escape char
+                bpe, byte pair encoding
+                quicklz
+                q3huff, Adaptive Huffman algorithm used in the Quake 3 engine
+                unmeng, algorithm used in DreamKiller
+                lz2k, algorithm used in various games developed by Traveller's Tales
+                darksector, a very basic algorithm used in the game Dark Sector
+                mszh, used in the LossLess Codec Library
+                un49g, used in the games of 49Games
+                unthandor, used in the old game Thandor
+                doomhuff, huffman used in doom, hexen, skulltag and other doom ports
+                  the DICT field can be used to specify a custom HuffFreq table (256 float elements)
+                aplib
+                tzar_lzss, used in Tzar of HaemimontGames
+                  DICT must contain the name of the variable with the algorithm
+                  number to use, example: ComType tzar_lzss MYVAR
+                lzf, aka fastlz
+                clz77, the lz77 algorithm available on http://compressions.sourceforge.net/about.html
+                lzrw1
+                dhuff, Huffman Decompression in LDS ("lossless datacompression sources" kit 1.1)
+                fin, from LDS
+                lzah (not tested)
+                lzh12, aka -lh4-
+                lzh13, aka -lh5-
+                grzip, aka GRZipII
+                ckrle, Chilkat RLE
+                quad, note that I removed the handling of the first 32bit number
+                  containing the size of the uncompressed data
+                balz, note that I removed the handling of the first 9 bytes from
+                  the files that contains ID and 64bit uncompressed size
+                deflate64
+                shrink (not tested)
+                z-base-32
+                base32hex
+                base32crockford
+                base32nintendo
+                base???, if ALGO starts with "base" then will be taken its
+                  subsequent number (for example 32 if it's "base32") and
+                  used for the conversion. the function supports ANY base
+                  conversion from 2 to 256.
+                  for bases larger than 64 will be used a char table starting
+                  from byte 0x00 so base128 will have a charset from 0 to 0x7f
+                brieflz
+                paq6, raw data block
+                shcodec
+                hstest_hs_unpack (never tested, could be removed in future)
+                hstest_unpackc (never tested, could be removed in future)
+                sixpack (never tested)
+                ashford (never tested, could be removed in future)
+                jcalg
+                jam
+                lzhlib
+                srank
+                zzip
+                scpack
+                  DICT supported (for the SCPACK_TABLE field)
+                rle3
+                bpe2
+                bcl_huf, Basic Compression Library
+                bcl_lz, Basic Compression Library
+                bcl_rice, Basic Compression Library
+                  you must use DICT to specify the format (1 to 8)
+                bcl_rle, Basic Compression Library
+                bcl_sf, Basic Compression Library
+                scz
+                szip
+                ppmd, ppmd var.i rev.1 with ZIP specifics so 2 bytes of info followed by the compressed data
+                ppmdi_raw
+                ppmdg
+                ppmdg_raw, requires DICT "SASize MaxOrder"
+                ppmdh
+                ppmdh_raw, requires DICT "SASize MaxOrder"
+                ppmdj
+                ppmdj_raw, requires DICT "SASize MaxOrder CutOff"
+                sr3c
+                huffmanlib
+                sfastpacker, smart+simple mode
+                sfastpacker2, smart-mode only
+                dk2, RefPack used in Dungeon Keeper 2 and other Bullfrog/EA games
+                lz77wii, (use input size as output size in clog)
+                lz77wii_raw10, tag 0x10 lz77
+                darkstone, lz77 compression used in the game DarkStone
+                sfl_block_chunked, as sfl_block with automatic handling of
+                  the chunks if used
+                yuke_bpe, used in the PS2 games developed by Yuke
+                stalker_lza, used in STALKER, use the output size equal to
+                  the compressed one (it's handled internally)
+                prs_8ing
+                puyo_cnx, raw compressed data from offset 0x10
+                puyo_cxlz, raw compressed data from offset 0x8
+                puyo_lz00, raw compressed data from offset 0x32
+                puyo_lz01, raw compressed data from offset 0x10
+                puyo_lzss, raw compressed data from offset 0x4
+                puyo_onz, raw compressed data from offset 0x4
+                puyo_prs
+                falcom
+                cpk, used by the CRI developers (LAYLA)
+                bzip2_file, exactly like bzip2 but it automatically calculates
+                  the output size, so use ZSIZE ZSIZE in clog
+                lz77wii_raw11, tag 0x11 lzss
+                lz77wii_raw20, tag 0x20 huffman (not supported at the moment)
+                lz77wii_raw30, tag 0x30 rle
+                lz77wii_raw40
+                pglz, postgresql compression (headerless)
+                UnPackSLZ
+                slz_01, used in tri-ace slz type 1
+                slz_02, used in tri-ace slz type 2
+                slz_03, used in tri-ace slz type 2
+                lzhl
+                d3101
+                squeeze
+                lzrw3
+                tdcb_ahuff
+                tdcb_arith
+                tdcb_arith1
+                tdcb_arith1e
+                tdcb_arithn
+                tdcb_compand
+                tdcb_huff
+                tdcb_lzss, dict for INDEX_BIT_COUNT, LENGTH_BIT_COUNT, DUMMY9, END_OF_STREAM
+                tdcb_lzw12
+                tdcb_lzw15v
+                tdcb_silence
+                rdc
+                ilzr
+                dmc2
+                diffcomp
+                lzr
+                lzs (aka mppc)
+                lzs_big (aka mppc_big)
+                mohlzss
+                mohrle
+                yaz0 (aka szs)
+                byte2hex
+                un434a
+                xxdecode
+                pack, the one supported in gzip
+                unzip_dynamic, automatic zlib/deflate and output size, cool but
+                  keep in mind that while zlib is almost error free due to the
+                  checksum at its end, deflate doesn't guarantee a valid output
+                  so, even if it uncompress the data, it may be invalid.
+                  use zlib_noerror if you are 100% sure that the input is zlib or
+                  non compressed, and deflate_noerror for deflate
+                zlib_noerror, as zlib but doesn't quit in case of errors and
+                  automatically allocates the output buffer
+                deflate_noerror, as above but for deflate
+                ppmdh
+                ppmdh_raw
+                rnc
+                rnc_raw
+                pak_explode, alone in the dark
+                KENS_Nemesis
+                KENS_Kosinski
+                KENS_Kosinski_moduled
+                KENS_Enigma
+                KENS_Saxman
+                dragonballz (STPZ/0DCS/0LCS/STPK archives, Spyke developers?)
+                NitroSDK (nitroCompLib)
+                zdaemon, like doomhuff but different freq table
+                skulltag, like doomhuff but different freq table
+                msf, headerless lzma same as lzma_0
+                stargunner
+                ntcompress
+                crle
+                ctw
+                DACT_DELTA
+                DACT_MZLIB2
+                DACT_MZLIB
+                DACT_RLE
+                DACT_SNIBBLE
+                DACT_TEXT
+                DACT_TEXTRLE
+                EXECUTE:
+                  use DICT to specify the command to execute using #INPUT#
+                  instead of the input filename and #OUTPUT# for the output
+                  one and the various variables like you do for the Print
+                  command, example:
+                  comtype EXECUTE "ctw.exe d #INPUT# #OUTPUT#"
+                  comtype EXECUTE "ctw.exe d #INPUT# %NAME%"
+                  clog "output.dat" 0 ZSIZE ZSIZE   # SIZE is not needed
+                CALLDLL:
+                  exactly as above but allows to specify a calldll command
+                  executed on input: "#INPUT#", "#INPUT_SIZE#", "#OUTPUT#",
+                  "#OUTPUT_SIZE#" and %VAR%.
+                  experimental
+                lz77_0
+                lzbss
+                bpaq0
+                lzpx, lzpxj
+                mar_rle
+                gdcm_rle
+                dict
+                rep
+                lzp (it's a preprocessor and not a real compression)
+                elias_delta
+                elias_gamma
+                elias_omega
+                packbits
+                darksector_nochunks
+                enet
+                eduke32, lzwuncompress
+                xu4_rle
+                rvl, lemur int compression
+                lzfu, MS RTF
+                lzfu_raw
+                xu4_lzw, Ultima 4
+                he3, without the HE3\x0d signature and output size
+                iris, Ultima Online algorithms
+                iris_huffman
+                iris_uo_huffman
+                ntfs
+                pdb
+                COMPRLIB_SPREAD
+                COMPRLIB_RLE1
+                COMPRLIB_RLE2
+                COMPRLIB_RLE3
+                COMPRLIB_RLE4
+                COMPRLIB_ARITH
+                COMPRLIB_SPLAY
+                cabextract, it may be the same lzx of mspack
+                mrci
+                hd2_01
+                hd2_08
+                hd2_01raw
+                rtl_lznt1
+                rtl_xpress, looks not supported by XP/7
+                rtl_xpress_huff, looks not supported by XP/7
+                prs
+                sega_lz77
+                saint_seya, used for GMI compression
+                ntcompress30
+                ntcompress40
+                yakuza, used by SEGA CS1 team
+                lz4 (the algorithm of lz4hc is the same)
+                snappy
+                lunar_lz1  to lz19
+                lunar_rle1 to rle4
+                goldensun
+                luminousarc
+                lzv1
+                fastlzah, it should be identical to lzf
+                zax
+                shrinker
+                mmini_huffman
+                mmini_lz1
+                mmini
+                clzw
+                lzham, use the dictionary to specify the following fields:
+                  m_dict_size_log2, m_table_update_rate, m_decompress_flags,
+                  m_table_max_update_interval, m_table_update_interval_slow_rate
+                  otherwise it will try to brute force the first 3 fields
+                lpaq8
+                sega_lzs2, automatic handling of CM/lzs2 and decompressed size
+                wolf
+                coreonline
+                mszip, "CK" included (from libmspack)
+                qtm, (from libmspack)
+                mslzss, (from libmspack)
+                mslzss1, (from libmspack)
+                mslzss2, (from libmspack)
+                kwaj, mslzh (from libmspack)
+                lzlib (lzip)
+                dflt
+                lzma_dynamic, automatic output size and automatic scanning of
+                  any supported flag, so it should blindly work against any
+                  compressed lzma input.
+                  if it's not compressed, the input will be copied on the output.
+                  another difference with "lzma" is that lzma returns an error
+                  if the input buffer doesn't have other compressed bytes
+                  (LZMA_STATUS_NEEDS_MORE_INPUT) while lzma_dynamic gives the ok,
+                  this is useful with some rare cases like Far Cry 3 (fat2_fat3.bms)
+                lzma2_dynamic, automatic output size
+                lzma2_efs
+                lzxcab_delta
+                lzxchm_delta
+                ffce
+                SCUMMVM1 -> SCUMMVM53   many algorithms used in Scummvm
+                lzs_unzip, PSP_Nanoha
+                legend_of_mana
+                dizzy
+                edl1
+                edl2
+                dungeon_kid
+                frontmission2
+                rleinc1
+                rleinc2
+                evolution
+                unknown1 -> unknown19
+                blackdesert
+                blackdesert_raw
+                pucrunch
+                zpaq
+                zyxel_lzs
+                blosc
+                gipfeli
+                crush
+                yappy
+                lzg
+                doboz
+                tornado
+                xpksqsh
+                amiga_unsquash
+                amiga_bytekiller
+                amiga_flashspeed
+                amiga_iamice
+                amiga_iamatm
+                amiga_isc1p
+                amiga_isc2p
+                amiga_isc3p
+                amiga_upcomp
+                amiga_uphd
+                amiga_bytekiller3
+                amiga_bytekiller2
+                amiga_crunchmania17b
+                amiga_powerpacker
+                amiga_stonecracker2
+                amiga_stonecracker3
+                amiga_stonecracker4
+                amiga_crunchmaster
+                amiga_crunchmania
+                amiga_crunchmaniah
+                amiga_crunchomatic
+                amiga_discovery
+                amiga_lightpack
+                amiga_mastercruncher
+                amiga_maxpacker
+                amiga_megacruncher
+                amiga_packit
+                amiga_spikecruncher
+                amiga_tetrapack
+                amiga_timedecrunch
+                amiga_tryit
+                amiga_tuc
+                amiga_turbosqueezer61
+                amiga_turbosqueezer80
+                amiga_turtlesmasher
+                amiga_dms
+                amiga_packfire
+                alba_bpe5
+                alba_bpe2
+                flzp
+                sr2
+                sr3
+                bpe2v3
+                bpe_alt1
+                bpe_alt2
+                cbpe
+                scpack0
+                LZMA_0, those with the '0' (zero) at the end are headerless,
+                  use the dictionary to specify the dictionary size IF necessary
+                LZMA_86HEAD0
+                LZMA_86DEC0
+                LZMA_86DECHEAD0
+                LZMA_EFS0
+                LZMA2_0
+                LZMA2_86HEAD0
+                LZMA2_86DEC0
+                LZMA2_86DECHEAD0
+                LZMA2_EFS0
+                lzovl
+                NITROSDK_DIFF8
+                NITROSDK_DIFF16
+                NITROSDK_HUFF8
+                NITROSDK_HUFF16
+                NITROSDK_LZ
+                NITROSDK_RL
+                qcmp
+                sparse
+                stormhuff
+                gzip_strict, gzip without autoguessing the presence of crc32 and
+                  isize at the end, use this if the file is a real 100% gzip file
+                CT_HughesTransform
+                CT_LZ77
+                CT_ELSCoder
+                CT_RefPack
+                qfs, same as dk2
+                PXP
+                BOH
+                GRC
+                ZEN
+                LZHUFXR
+                FSE
+                FSE_RLE
+                ZSTD
+                CSC
+                RNCb
+                RNCb_RAW
+                RNCc_RAW
+                AZO
+                PP20
+                DS_BLZ
+                DS_HUF
+                DS_LZE
+                DS_LZS
+                DS_LZX
+                DS_RLE
+                FAB
+                LZ4F
+                PCLZFG
+                LZOO
+                DELZC
+                DEHUFF
+                HEATSHRINK
+                MRLE
+                SMAZ
+                LZFX
+                PITHY
+                ZLING
+                DENSITY
+                BROTLI
+                RLE32
+                RLE35
+                BSC
+                SHOCO
+                WFLZ
+                FARI
+                RLE_ORCOM
+                DICKY
+                SQUISH
+                LZNT1        // available also for Linux
+                XPRESS       // available also for Linux
+                XPRESS_HUFF  // available also for Linux
+                LZJODY
+                NEPTUNIA
+                SMAZ
+                LZFX
+                PITHY
+                ZLING
+                DENSITY
+                BROTLI
+                RLE32
+                RLE35
+                BSC
+                SHOCO
+                WFLZ
+                FASTARI
+                RLE_ORCOM
+                DICKY
+                SQUISH
+                LZNT1
+                XPRESS
+                XPRESS_HUFF
+                LZJODY
+                TRLE
+                SRLE
+                MRLE
+                LUNAR_LZ19
+                JCH
+                LZRW1KH
+                LZSS0
+                LHA_lz5
+                LHA_lzs
+                LHA_lh1
+                LHA_lh4
+                LHA_lh5
+                LHA_lh6
+                LHA_lh7
+                LHA_lhx
+                LHA_pm1
+                LHA_pm2
+                SQX1, currently it doesn't work at 100%
+                MDIP_ARAD
+                MDIP_ARST
+                MDIP_DELTA
+                MDIP_FREQ
+                MDIP_HUFFMAN
+                MDIP_CANONICAL
+                MDIP_LZSS
+                MDIP_LZW
+                MDIP_RICE
+                MDIP_RLE
+                MDIP_VPACKBITS
+                bizarre
+                bizarre_skip
+                lzssx
+                ash
+                YAY0
+                DSTACKER
+                DSTACKER_SD3
+                DSTACKER_SD4
+                DBLSPACE
+                DBLSPACE_JM
+                XREFPACK, just another dk2/refpack
+                XREFPACK0, as above but without handling of header
+                qcmp2, UFG::qDecompressLZ probably the same of qcmp
+                deflatex, deflate used in Aeriagames pkg.idx
+                zlibx, as above but skips the first 2 bytes
+                lzrw1a
+                lzrw2
+                lzrw3a
+                lzrw5
+                LEGO_IXS
+                mcomp,   libmcomp / MCMQ / MCMP
+                mcomp0,  rolz
+                mcomp1,  rolz3 (or deflate fast on mcomp.exe)
+                mcomp2,  lz
+                mcomp3,  deflate
+                mcomp4,  deflate64
+                mcomp5,  bzip2
+                mcomp6,  ppmdj
+                mcomp7,  sl
+                mcomp8,  sm
+                mcomp9,  dmc
+                mcomp10, ??? (10,11,12,18,19,20 are all the same function)
+                mcomp13, fpw1
+                mcomp14, fpw2
+                mcomp15, fpw3
+                mcomp16, fpw4
+                mcomp17, pwcm
+                irolz
+                irolz2
+                uclpack
+                ace
+                ea_comp
+                ea_huff
+                ea_jdlz
+                tornado_byte
+                tornado_bit
+                tornado_huf
+                tornado_ari
+                lbalzss1
+                lbalzss2
+                dbpf, Maxis DBPF
+                TITUS_LZW
+                TITUS_HUFFMAN
+                KB_LZW
+                KB_DOSLZW
+                CARMACK
+                MBASH
+                DDAVE
+                GOT
+                SKYROADS
+                ZONE66
+                EXEPACK
+                DE_LZW
+                JJRLE
+                K13RLE
+                SFRLC
+                WESTWOOD1
+                WESTWOOD3
+                WESTWOOD3b
+                WESTWOOD40
+                WESTWOOD80
+                PKWARE_DCL
+                TERSE
+                TERSE_SPACK_RAW
+                TERSE_PACK_RAW
+                REDUCE1
+                REDUCE2
+                REDUCE3
+                REDUCE4
+                LZW_ENGINE, requires the following parameters:
+                  - initial codeword length (in bits)
+                  - maximum codeword length (in bits)
+                  - first valid codeword
+                  - EOF codeword is first codeword
+                  - reset codeword is shared with EOF
+                  - flags (check src/compression/filter-lzw.h)
+                LZW_BASH
+                LZW_EPFS
+                LZW_STELLAR7
+                ULTIMA6
+                LZ5
+                LZ5F
+                YALZ77
+                LZKN1
+                LZKN2
+                LZKN3
+                TFLZSS
+                SYNLZ1
+                SYNLZ1b
+                SYNLZ1partial
+                SYNLZ2
+                PPMZ2
+                OPENDARK
+
+                  --------------------------------
+                  --- recompression algorithms ---
+                  --------------------------------
+                zlib_compress
+                deflate_compress
+                lzo1_compress
+                lzo1x_compress
+                lzo2a_compress
+                xmemlzx_compress
+                bzip2_compress
+                gzip_compress
+                lzss_compress
+                sfl_block_compress
+                sfl_rle_compress
+                sfl_nulls_compress
+                sfl_bits_compress
+                lzf_compress
+                brieflz_compress
+                jcalg_compress
+                bcl_huf_compress
+                bcl_lz_compress
+                bcl_rice_compress
+                bcl_rle_compress
+                bcl_sf_compress
+                szip_compress
+                huffmanlib_compress
+                lzma_compress
+                lzma_86head_compress
+                lzma_86dec_compress
+                lzma_86dechead_compress
+                lzma_efs_compress
+                falcom_compress
+                kzip_zlib_compress
+                kzip_deflate_compress
+                prs_compress
+                rnc_compress
+                lz4_compress
+                sfl_block_chunked_compress
+                snappy_compress
+                zpaq_compress
+                blosc_compress
+                gipfeli_compress
+                yappy_compress
+                lzg_compress
+                doboz_compress
+                nitrosdk_compress
+                hex_compress
+                base64_compress
+                lzma2_compress
+                lzma2_86head_compress
+                lzma2_86dec_compress
+                lzma2_86dechead_compress
+                lzma2_efs_compress
+                lzma_0_compress
+                lzma2_0_compress
+                stormhuff_compress
+                CT_HughesTransform_compress
+                CT_LZ77_compress
+                CT_ELSCoder_compress
+                CT_RefPack_compress
+                dk2_compress
+                qfs_compress, same as dk2_compress
+                LZHUFXR_COMPRESS
+                FSE_COMPRESS
+                ZSTD_COMPRESS
+                DS_BLZ_COMPRESS
+                DS_HUF_COMPRESS
+                DS_LZE_COMPRESS
+                DS_LZS_COMPRESS
+                DS_LZX_COMPRESS
+                DS_RLE_COMPRESS
+                HEATSHRINK_COMPRESS
+                SMAZ_COMPRESS
+                LZFX_COMPRESS
+                PITHY_COMPRESS
+                ZLING_COMPRESS
+                DENSITY_COMPRESS
+                BSC_COMPRESS
+                SHOCO_COMPRESS
+                WFLZ_COMPRESS
+                FASTARI_COMPRESS
+                DICKY_COMPRESS
+                SQUISH_COMPRESS
+                LZHL_COMPRESS
+                LZHAM_COMPRESS
+                TRLE_COMPRESS
+                SRLE_COMPRESS
+                MRLE_COMPRESS
+                CPK_COMPRESS, note that in reimport mode it may not work
+                    because the decompression is size-dependent so the
+                    compressed size will probably change but the value
+                    will not be modified in the original archive (the
+                    reimport mode changes only the data of the files).
+                    if you want it to work you have to manually edit the
+                    value from the archive, launch quickbms -V and search
+                    something like the following:
+                        . 00000eef get     value      0x0000e548 4
+                        . 00000023 get     column_name "FileSize" -1
+                    in that example you have to set the new value at
+                    offset 0xeef, but note that the new compressed size
+                    is not displayed by quickbms... yeah not easy
+                LZRW1KH_COMPRESS
+                BPE_COMPRESS
+                NRV2b_COMPRESS
+                NRV2d_COMPRESS
+                NRV2e_COMPRESS
+                LZSS0_COMPRESS
+                CLZW_COMPRESS
+                QUICKLZ_COMPRESS
+                ZOPFLI_ZLIB_COMPRESS
+                ZOPFLI_DEFLATE_COMPRESS
+                PKWARE_DCL_COMPRESS
+                LZ5_COMPRESS
+                YALZ77_COMPRESS
+                LZ5_COMPRESS
+                YALZ77_COMPRESS
+                SYNLZ1_COMPRESS
+                SYNLZ2_COMPRESS
+                PPMZ2_COMPRESS
+
+                *note:
+                    you can find the updated list in the COMP_ enumeration
+                    inside defs.h, they have also a number on their right
+                    that is used to find the algorithm when using my
+                    compressions scanner
+
+    DICT        an optional C string containing the bytes of the dictionary
+                (cstring) or particular parameters depending by the chosen
+                algorithm.
+                Note that DICT can be:
+                - a cstring
+                  comtype algo "\x11\x22\x33"     // static binary dictionary
+                - a variable for which, often, you must specify also a length
+                  comtype algo DICT DICT_SIZE     // variable dictionary
+
+
+.......................................................................
+
+ReverseShort VAR
+
+    Classical swap that inverts a 16bit variable from 0x2211 to 0x1122
+    and vice versa.
+
+    Arguments:
+      VAR       variable to flip
+
+
+.......................................................................
+
+ReverseLong VAR
+
+    Classical swap that inverts a 32bit variable from 0x44332211 to
+    0x11223344 and vice versa.
+
+    Arguments:
+      VAR       variable to flip
+
+
+.......................................................................
+
+ReverseLongLong VAR
+
+    Classical swap that inverts a 32bit variable from 0x8877665544332211
+    to 0x1122334455667788 and vice versa.
+    This command works only with quickbms_4gb_files.exe
+
+    Arguments:
+      VAR       variable to flip
+
+
+.......................................................................
+
+Endian TYPE [VAR]
+
+    It changes the current global endianess of the read/written data,
+    the default one is little endian.
+
+    Arguments:
+      TYPE      - little, intel
+                  endianess where 0x11223344 is stored as 44 33 22 11
+                - big, network
+                  endianess where 0x11223344 is stored as 11 22 33 44
+                - swap, change, invert
+                  change endianess, if it was big now will be little
+                - guess
+                  followed by a 32bit number. The function swaps the number
+                    and compares it with the original one so if the number
+                    is 0x04000000 then the swapped one will be 0x4 and the
+                    tool will change the global endianess and the one of
+                    the variable
+                - guess16
+                  followed by a 16bit number
+                - guess64
+                  followed by a 64bit number
+                - guess24
+                  followed by a 24bit number
+                - save, store
+                  stores the current endian in VAR: 1 for big and 0 for little
+
+    Examples:
+      print "little endian"
+      endian big
+      print "big endian"
+      endian little
+      print "little endian"
+      endian change
+      print "little->big endian"
+      endian guess 0x04000000
+      print "guess endian"
+      endian save CURRENT_ENDIAN
+      if CURRENT_ENDIAN == 0
+        print "little endian"
+      else
+        print "big endian"
+      endif
+
+
+.......................................................................
+
+FileXOR SEQ [OFFSET]
+
+    Any read operation (Get, *Log and so on) on any file will perform
+    also the xoring of the read data with the numbers contained in the
+    given string or in the given variable.
+    The OFFSET field by default is zero which means that if the data
+    must be xored with more than one byte (a "xor key") the first byte
+    of the key is the first byte at OFFSET which is 0 by default
+    (beginning of the file).
+    Recap: the FileXOR command works with ANY file access.
+
+    Arguments:
+      SEQ       Sequence of space-separated 8bit numbers, it can be a:
+                - sequence of bytes separated by space like 0x12 or
+                  "0x12 0x34 0x56" or directly a C hex string like
+                  "\x12\x34\x56" (NOT a C notation!)
+                - a numeric variable like MYXORKEY
+                - a string that doesn't start with numbers, '\' or '-'
+                Currently it's not possible to use a key in string mode
+                and use the Encryption command for doing it, so if you
+                have a string convert it to a numeric sequence first or
+                be sure that it doesn't start with the chars shown above.
+                Set it to 0 or "" for disabling the xor
+                Note that SEQ can be also a 32bit signed number like
+                filexor 0x11223344 but the size is decided by value so
+                0x00000022 is 8 bit and not 32, while -0x20 is considered
+                8bit and 0x80112233 a 32bit.
+      OFFSET    Needed only for the xor key offset.
+                If the archive is xored with a xor key from its beginning
+                  (so first byte of the archive xored with the first one
+                  of the key) this argument is usually not necessary
+                Instead if only the file to extract is xored, this
+                  argument must have the same offset of the file (so
+                  just reuse the same OFFSET used in Log)
+
+    Examples:
+      filexor 0xff
+      filexor -0x20
+      filexor 0x1122    # 32bit
+      filexor -0x1122   # 32bit
+      filexor "0x12 0x34 123 255"
+      filexor MYXORBYTE
+      saepos OFFSET
+      filexor "0x12 0x34 123 255" OFFSET
+      filexor "\x12\x34\x7b\xff"
+      Log NAME OFFSET SIZE
+
+
+.......................................................................
+
+FileRot SEQ [OFFSET]
+
+    Exactly as for FileXOR but it performs a sum operation.
+    For example if SEQ is 0x01 and the file contains "hello" it will
+    become "ifmmp" while if SEQ is -1 or 0xff it will become "gdkkn".
+    -1 and 0xff are the same because it's a 8 bit number while
+    0x100 or -0x100 are considered 32bit.
+    Recap: the FileRot command works with ANY file access
+
+    Watch the previous arguments and examples.
+
+
+.......................................................................
+
+FileCrypt SEQ [OFFSET]
+
+    Experimental, it works only if has been already specified and
+    enabled the Encryption command and basically applies those
+    algorithms to the normal file reading operations.
+    Note that at the moment OFFSET is unused and SEQ can be only 1 for
+    activating it and "" to disable it ("" and NOT 0!).
+    Remember that the encryption algorithms usually work on blocks of
+    data so this command is probably useless.
+
+    Full example:
+      get NAMESZ long
+      encryption xor "\x11\x22\x33\x44"
+      filecrypt 1
+      getdstring NAME NAMESZ
+      filecrypt ""
+      encryption "" ""
+
+
+.......................................................................
+
+Strlen VAR VAR [SIZE]
+
+    It calculates the length of the second variable (as string) and
+    stores it in the first one.
+    The length is the amount of consecutive non-zero bytes, so it
+    doesn't work with unicode strings except if, maybe, SIZE is set.
+    Note that for practical reasons this command can be emulated also
+    using "set VAR strlen VAR".
+
+    arguments
+      VAR       Destination variable which will contain the length
+      VAR       Variable of which calculating the length
+      SIZE      set it to 1 to receive the size of the variable instead
+                of its NULL delimited lenght, may be useful in some
+                situations where you need to ignore the 0x00 bytes
+
+    examples
+      strlen NAME_LENGTH NAME
+      strlen NAMESZ NAME
+      strlen RAW_NAMESZ NAME 1
+
+
+.......................................................................
+
+GetVarChr VAR VAR OFFSET [TYPE]
+
+    A particular and sometimes very useful command which works exactly
+    like accessing an array of elements contained in the second variable,
+    for example a string or a memory file.
+    It can be compared to C as: var1 = var2[offset];
+    This simple and effective method allows the manipulation of strings
+    and variables for creating custom headers (like a DDS) and moreover
+    for performing operations on a piece of the memory, like a custom
+    encryption algorithm.
+    Some real examples are my Deer Hunter 2004/2005 scripts.
+
+    Arguments:
+      VAR       Destination variable which will contain the read element
+      VAR       Variable or memory file from which you want to get the
+                element
+      OFFSET    Position of the second variable where taking the element
+      TYPE      Type of the element to read and assign to the first
+                variable, if not specified it's a BYTE so a 8bit number.
+                You can specify most of the available datatypes like
+                short, long, longlong and so on
+
+    Examples:
+      For i = 0 < SIZE
+          GetVarChr TMP MEMORY_FILE i
+          GetVarChr TMP MEMORY_FILE i long
+          # GetVarChr TMP MEMORY_FILE i string
+      Next i
+
+
+.......................................................................
+
+PutVarChr VAR OFFSET VAR [TYPE]
+
+    The "write-mode" alternative of the previous command which allows
+    to perform various complex operations with custom algorithms (like
+    in my Deer Hunter 2004/2005 scripts).
+    It can be compared to C as: var1[offset] = var2;
+    Note that PutVarChr can be also used as an allocator of memory that
+    is often useful in the implementation of custom decompression
+    algorithms or, moreover, for pre-allocating a MEMORY_FILE for
+    storing chunks. This is useful to avoid wasting time and memory
+    with the incremental allocation, remember only to use the command
+    "Log MEMORY_FILE 0 0" after it for resetting the position of the
+    MEMORY_FILE.
+
+    arguments
+      VAR       Variable or memory file in which you want to put the
+                element
+      OFFSET    Position of the output where placing the element, it can
+                be also negative in which case it will work from the end
+                of the variable (may not work in some conditions)
+      VAR       Source variable which will contain the element to write
+      TYPE      Type of the element to read and assign to the first
+                variable, if not specified it's a BYTE so a 8bit number.
+                You can specify most of the available datatypes like
+                short, long, longlong and so on.
+
+    Examples:
+      For i = 0 < SIZE
+          GetVarChr TMP MEMORY_FILE i
+          Math TMP ^= 0xff
+          PutVarChr MEMORY_FILE i TMP
+      Next i
+
+
+.......................................................................
+
+Debug [MODE]
+
+    Switch command that enables the -v option in real-time for a
+    specific portion of the script, used only for debugging.
+
+    If MODE is specified and it's a positive number, QuickBMS will only
+    display the content of the variables read/written with the Get/Put
+    commands. This is very useful and cool for debugging file formats
+    and protocols in an easy way just like -V.
+
+    If MODE is negative, it will disable the verbose mode.
+
+    Examples:
+      debug     # like -v
+      debug 0   # like -v
+      debug 1   # like -V
+      debug -1  # disable -v/V
+
+
+.......................................................................
+
+Padding VAR [FILENUM] [BASE_OFF]
+
+    When called it performs an automatic GoTo to the next position of
+    the file skipping the aligned data.
+    Imagine to have a file where it's used an alignment of 4 bytes and
+    your current file offset is 0x39, if you use Padding 4 the offset
+    will be automatically changed to 0x3c.
+    By default the padding is referred to the beginning of the file
+    (offset 0).
+
+    Arguments:
+      VAR       Size of the alignment, for example 4 or 16 and so on
+      FILENUM   Number of the file associated to the archive (0)
+      BASE_OFF  base offset from which must be calculated the padding (0)
+
+    Examples:
+      Get NAME string
+      Padding 4
+      get OFFSET long
+
+
+.......................................................................
+
+Append [DIRECTION]
+
+    Command to enable the append mode in the *Log commands, so if the
+    output filename already exists it will not be overwritten, the new
+    content will be concatenated (appended) to the existent one.
+    Note that with real files (not memory files) the user may be prompted
+    before writing the output file if it already existed before the
+    running of the script.
+    Note that the reimport mode may not work correctly when you use a
+    combo of MEMORY_FILE and Append (like I usually do in my scripts),
+    so the direct and more simple Log to file + Append is suggested.
+
+    Arguments:
+      DIRECTION This is a new optional argument that allows to specify
+                where placing the new content:
+                -1  a negative value means that the new content will be
+                    placed before the current file, so the old content
+                    will be appended to the new one
+                0   the new content will be appended to the current one
+                    (default, just like without DIRECTION)
+                1   the new content will overwrite the current one without
+                    changing the file size if the new one is smaller, use
+                    goto to set the offset where placing the new content
+
+    Examples:
+      append
+      Log "dump.dat" 0 0x10
+      Log "dump.dat" 0x10 0x100
+
+    The following is a particular example for allocating a MEMORY_FILE
+    and using it instead of TEMPORARY_FILE saving space on the disk and
+    performances:
+      math TMP = CHUNKS
+      math TMP *= 0x8000
+      log MEMORY_FILE 0 0
+      putvarchr MEMORY_FILE TMP 0   # improves the speed with pre-allocation
+      log MEMORY_FILE 0 0           # reset the position and size of the file
+      append
+      for i = 0 < CHUNKS
+          ...
+          clog MEMORY_FILE OFFSET ZSIZE 0x8000
+      next i
+      append
+      get SIZE asize MEMORY_FILE
+
+
+.......................................................................
+
+Encryption ALGO KEY [IVEC] [MODE] [KEYLEN]
+
+    One of the most interesting commands which allows to set a
+    decryption algorithm used for the Log and CLog command.
+    QuickBMS supports also the hashing algorithms of OpenSSL, the
+    binary hash will be placed in the variable QUICKBMS_HASH while the
+    hexadecimal hash in QUICKBMS_HEXHASH (capital letters) and
+    QUICKBMS_HEXHASHL (low).
+    Note that the hashing algorithms don't need a key, but you can use
+    that field for performing a direct hash operation on the provided
+    key without using the log command, eg: encryption sha1 "mystring".
+    You can also specify the size in case it's a binary variable, eg:
+    encryption md5 "mystring" "" 0 8.
+    For the HMAC hash algorithm you must use the IVEC field, anyway
+    remember that this feature is just optional.
+
+    Arguments:
+      ALGO      aes, Rijndael
+                blowfish, you should try also bf_ecb if the result is
+                  not the expected one
+                des
+                3des-112
+                3des-168
+                rc4
+                tea, use IVEC to specify custom delta, sum, endian (0/1), cycles and if_invert_delta_operation
+                xtea, use IVEC to specify custom delta, endian (0/1), cycles and if_invert_delta_operation
+                xxtea, use IVEC to specify custom delta, endian (0/1), cycles and if_invert_delta_operation
+                idea
+                swap, use the bytes to swap as key, it works just like
+                  reverseshort and reverselong: encryption swap 2: 2211 -> 1122
+                reverseshort, swap 2
+                reverselong, swap 4
+                math, exactly like the bms command plus the size of the numbers:
+                    encryption math "^u= 0x11223344 1" 32
+                    encryption math "n #INPUT#"             # decrypted = -encrypted
+                  it means that this encryption can do tons of operations
+                  including xor, rot, rotate and so on.
+                  the "1" after the math operation means if we want to
+                  respect the exact size of each element like a sort of
+                  AND SIZE (default ignore).
+                  ivec is the size of each element (8 bits default)
+                xmath, key is the operation to perform for each element
+                  ivec is the size of each element (8 bits default)
+                  use #INPUT# to identify the element read from the data:
+                    encryption xmath "((#INPUT# + 1) << 2) + #INPUT#" 8
+                random, pseudo random incrementer (Linear congruential
+                  generator) xored with the input key contains a number
+                  corresponding to the algorithms listed on
+                  http://en.wikipedia.org/wiki/Linear%5Fcongruential%5Fgenerator#Parameters_in_common_use
+                  (0 is the first one) plus other algorithms like
+                  mersenne and so on.
+                  the second parameter in the key is the seed.
+                  the third one is the mask of bits of the key to use for
+                  the operation.
+                  ivec is the size of each element (8 bits default).
+                    encryption random "0 0x12345678"
+                    encryption random "0 0x12345678" 32         # 32bit values
+                    encryption random "0 0x12345678 0x7fff0000" # value ^ ((key >> 16) & 0x7fff)
+                  you must check the src\myenc.c source code to have the full list
+                xor
+                rot
+                rotate, an 8/16/32/64bit ror or any other bit as key, element size as ivec
+                reverse, flip the file from the end to the beginning
+                incremental,
+                  encryption "incremental xor" 0 0x01           # 8bit xor incremented by 1 each time
+                  encryption "incremental rot" 0x100 0x11223344 # 32bit rot starting from 0x100 incremented
+                                                                # by 0x11223344 each time
+                charset, the substitution algorithm which uses a charset of 256 chars
+                charset2, as above but the substitution is inverted, very useful
+                twofish
+                cast5
+                seed
+                serpent
+                ice
+                icecrypt, ICE algorithm with key implemented as in the
+                  homonym program, the difference with "ice" is ONLY in
+                  the key
+                rotor, added as experiment, ivec contains the number of
+                  rotors (12)
+                ssc, Leverage SSC
+                wincrypt, aka cryptdecrypt or cryptencrypt
+                  use the ivec field to specify the following fields
+                  (only those you need, not all are necessary):
+                  - the hashing algorithm - CryptCreateHash, you can find the key here
+                  - the encryption algorithm - CryptDeriveKey
+                  - the provider type - CryptAcquireContext
+                  - Microsoft provider name, like MS_DEF_DH_SCHANNEL_PROV
+                  - CryptDeriveKey flags, like CRYPT_CREATE_SALT
+                  - CryptDecrypt flags, like CRYPT_OAEP
+                  example:
+                    encryption CryptDecrypt "mykey" "CALG_MD5 CALG_RC4 PROV_RSA_FULL"
+                    encryption CryptDecrypt "1111" "CALG_MD5 CALG_RC4 PROV_RSA_FULL CRYPT_CREATE_SALT CRYPT_OAEP"
+                cryptunprotect, key is used to specify the entropy so the default is ""
+                zipcrypto, the first 12 bytes are the encryption header
+                  set the ivec to 1 for automatically cutting the first 12 bytes
+                md_null, from OpenSSL (does nothing)
+                md2, from OpenSSL (not available)
+                md4, from OpenSSL
+                md5, from OpenSSL
+                sha, from OpenSSL
+                sha1, from OpenSSL
+                dss, from OpenSSL
+                dss1, from OpenSSL
+                ecdsa, from OpenSSL
+                sha224, from OpenSSL
+                sha256, from OpenSSL
+                sha384, from OpenSSL
+                sha512, from OpenSSL
+                mdc2, from OpenSSL
+                ripemd160, from OpenSSL
+                whirlpool, from OpenSSL
+                hmac ..., hmac plus an OpenSSL hash algorithm, it's an
+                  encrypted hash so you must provide a key. example for
+                  a hmac sha1 on the fly:
+                    encryption "hmac sha1" "mykey" "mydata"
+                  or
+                    encryption "hmac sha1" "mykey"
+                    log MEMORY_FILE 0 SIZE
+                    print "%QUICKBMS_HEXHASH%"
+                enc_null, from OpenSSL (does nothing)
+                des_ecb, from OpenSSL
+                des_ede, from OpenSSL
+                des_ede3, from OpenSSL
+                des_ede_ecb, from OpenSSL
+                des_ede3_ecb, from OpenSSL
+                des_cfb64, from OpenSSL
+                des_cfb1, from OpenSSL
+                des_cfb8, from OpenSSL
+                des_ede_cfb64, from OpenSSL
+                des_ede_cfb1, from OpenSSL
+                des_ede_cfb8, from OpenSSL
+                des_ede3_cfb64, from OpenSSL
+                des_ede3_cfb1, from OpenSSL
+                des_ede3_cfb8, from OpenSSL
+                des_ofb, from OpenSSL
+                des_ede_ofb, from OpenSSL
+                des_ede3_ofb, from OpenSSL
+                des_cbc, from OpenSSL
+                des_ede_cbc, from OpenSSL
+                des_ede3_cbc, from OpenSSL
+                desx_cbc, from OpenSSL
+                dev_crypto_des_ede3_cbc, from OpenSSL
+                dev_crypto_rc4, from OpenSSL
+                dev_crypto_md5, from OpenSSL
+                rc4, from OpenSSL
+                rc4_40, from OpenSSL
+                idea_ecb, from OpenSSL
+                idea_cfb64, from OpenSSL
+                idea_ofb, from OpenSSL
+                idea_cbc, from OpenSSL
+                rc2_ecb, from OpenSSL
+                rc2_cbc, from OpenSSL
+                rc2_40_cbc, from OpenSSL
+                rc2_64_cbc, from OpenSSL
+                rc2_cfb64, from OpenSSL
+                rc2_ofb, from OpenSSL
+                bf_ecb, from OpenSSL (bf stands for blowfish)
+                  the result is different than the "blowfish" type because
+                  the other one uses big endian fields, try both
+                bf_cbc, from OpenSSL
+                bf_cfb64, from OpenSSL
+                bf_ofb, from OpenSSL
+                cast5_ecb, from OpenSSL
+                cast5_cbc, from OpenSSL
+                cast5_cfb64, from OpenSSL
+                cast5_ofb, from OpenSSL
+                rc5_32_12_16_cbc, from OpenSSL (not available)
+                rc5_32_12_16_ecb, from OpenSSL (not available)
+                rc5_32_12_16_cfb64, from OpenSSL (not available)
+                rc5_32_12_16_ofb, from OpenSSL (not available)
+                aes_128_ecb, from OpenSSL
+                aes_128_cbc, from OpenSSL
+                aes_128_cfb1, from OpenSSL
+                aes_128_cfb8, from OpenSSL
+                aes_128_cfb128, from OpenSSL
+                aes_128_ofb, from OpenSSL
+                aes_128_ctr, from OpenSSL
+                aes_192_ecb, from OpenSSL
+                aes_192_cbc, from OpenSSL
+                aes_192_cfb1, from OpenSSL
+                aes_192_cfb8, from OpenSSL
+                aes_192_cfb128, from OpenSSL
+                aes_192_ofb, from OpenSSL
+                aes_192_ctr, from OpenSSL
+                aes_256_ecb, from OpenSSL
+                aes_256_cbc, from OpenSSL
+                aes_256_cfb1, from OpenSSL
+                aes_256_cfb8, from OpenSSL
+                aes_256_cfb128, from OpenSSL
+                aes_256_ofb, from OpenSSL
+                aes_256_ctr, from OpenSSL
+                camellia_128_ecb, from OpenSSL
+                camellia_128_cbc, from OpenSSL
+                camellia_128_cfb1, from OpenSSL
+                camellia_128_cfb8, from OpenSSL
+                camellia_128_cfb128, from OpenSSL
+                camellia_128_ofb, from OpenSSL
+                camellia_192_ecb, from OpenSSL
+                camellia_192_cbc, from OpenSSL
+                camellia_192_cfb1, from OpenSSL
+                camellia_192_cfb8, from OpenSSL
+                camellia_192_cfb128, from OpenSSL
+                camellia_192_ofb, from OpenSSL
+                camellia_256_ecb, from OpenSSL
+                camellia_256_cbc, from OpenSSL
+                camellia_256_cfb1, from OpenSSL
+                camellia_256_cfb8, from OpenSSL
+                camellia_256_cfb128, from OpenSSL
+                camellia_256_ofb, from OpenSSL
+                seed_ecb, from OpenSSL
+                seed_cbc, from OpenSSL
+                seed_cfb128, from OpenSSL
+                seed_ofb, from OpenSSL
+                mcrypt blowfish
+                mcrypt des
+                mcrypt tripledes
+                mcrypt threeway
+                mcrypt gost
+                mcrypt safer-sk64
+                mcrypt safer-sk128
+                mcrypt cast-128
+                mcrypt xtea
+                mcrypt rc2
+                mcrypt twofish
+                mcrypt cast-256
+                mcrypt saferplus
+                mcrypt loki97
+                mcrypt serpent
+                mcrypt rijndael-128
+                mcrypt rijndael-192
+                mcrypt rijndael-256
+                mcrypt enigma
+                mcrypt arcfour
+                mcrypt wake
+                  note that for the algorithms supported by mcrypt you
+                  can force their loading by preceeding ALGO with "mcrypt"
+                  like "mcrypt_enigma" and you can decide also their mode
+                  like "mcrypt_enigma_ecb" or "mcrypt_enigma_cbc", list:
+                  cbc, ecb, cfb, ofb and nofb
+                3way
+                skipjack
+                anubis
+                aria
+                crypton
+                frog
+                gost
+                lucifer
+                mars
+                misty1
+                noekeon
+                seal
+                safer
+                kirk, used in PSP eboot encryption, use the ivec to specify
+                  the keys/encryption (default is 1, refer to libkirk for
+                  more information)
+                pc1, automatic 128/256 bit selection based on key length
+                blake224
+                blake256
+                blake384
+                blake512
+                bmw224
+                bmw256
+                bmw384
+                bmw512
+                cubehash224
+                cubehash256
+                cubehash384
+                cubehash512
+                echo224
+                echo256
+                echo384
+                echo512
+                fugue224
+                fugue256
+                fugue384
+                fugue512
+                groestl224
+                groestl256
+                groestl384
+                groestl512
+                hamsi224
+                hamsi256
+                hamsi384
+                hamsi512
+                haval128_3
+                haval128_4
+                haval128_5
+                haval160_3
+                haval160_4
+                haval160_5
+                haval192_3
+                haval192_4
+                haval192_5
+                haval224_3
+                haval224_4
+                haval224_5
+                haval256_3
+                haval256_4
+                haval256_5
+                jh224
+                jh256
+                jh384
+                jh512
+                keccak224
+                keccak256
+                keccak384
+                keccak512
+                luffa224
+                luffa256
+                luffa384
+                luffa512
+                md2
+                md4
+                md5
+                panama
+                radiogatun32
+                radiogatun64
+                ripemd
+                ripemd128
+                ripemd160
+                sha0
+                sha1
+                sha224
+                sha256
+                sha384
+                sha512
+                shabal192
+                shabal224
+                shabal256
+                shabal384
+                shabal512
+                shavite224
+                shavite256
+                shavite384
+                shavite512
+                simd224
+                simd256
+                simd384
+                simd512
+                skein224
+                skein256
+                skein384
+                skein512
+                tiger
+                tiger2
+                whirlpool
+                whirlpool0
+                whirlpool1
+                sph
+                mpq
+                rc6
+                xor_prev    < data[i] ^= data[i - 1]    use key + or - to use operations
+                                                        different than xor and the value to
+                                                        use for the last byte, "^ 0x8e"
+                xor_prev2   < data[i] ^= data[i + 1]    "
+                xor_next    > data[i] ^= data[i - 1]    "
+                xor_next2   > data[i] ^= data[i + 1]    "
+                PKCS5_PBKDF2_HMAC, example PKCS5_PBKDF2_HMAC_sha1
+                BytesToKey, example "BytesToKey_sha1 aes"
+                ZIP_AES followed by 128, 192 or 256
+                rsa
+                rsa_tomcrypt
+                modpow, just a simple RSA BN_mod_exp performed on chunks of 256 bytes
+                modpow_zed
+                abc
+                achterbahn
+                achterbahn128
+                cryptmt
+                dicing
+                dragon
+                edon80
+                ffcsr8
+                fubuki
+                grain
+                grain128
+                hc128
+                hc256
+                hermes128
+                hermes80
+                lex
+                mag
+                mickey
+                mickey128
+                mir1
+                mosquito
+                moustique
+                nls
+                polarbear
+                pomaranch
+                py
+                rabbit
+                salsa20
+                sfinks
+                sosemanuk
+                sss
+                trivium
+                tsc3
+                tsc4
+                wg
+                yamb
+                aes_ige
+                aes_bi_ige
+                aes_heat, used in the game Heat Online
+                de_html, remove html/xml tags
+                easy_html, html/xml formatter that puts one tag or text per line
+                tomcrypt
+                  modes: ecb, cfb, ofb, cbc, ctr, lrw, f8, xts
+                  encryptions: blowfish, rc5, rc6, rc2, saferp, safer_k64,
+                    safer_k128, safer_sk64, safer_sk128, rijndael, aes,
+                    rijndael_enc, aes_enc, xtea, twofish, des, des3, cast5,
+                    noekeon, skipjack, khazad, anubis, kseed, kasumi, camellia
+                  hashing: multi2, chc, whirlpool, sha512, sha512-256, sha512-224,
+                    sha384, sha256, sha224, sha1, md5, md4, md2, tiger, rmd128,
+                    rmd160, rmd256, rmd320
+                  example: Encryption "tomcrypt rijndael ecb" "0123456789abcdef"
+                crc, a complete and powerful checksum function that can
+                  be fully configured:
+                  - key is the polynomial (use "" for the default crc32 0x77073096)
+                  - ivec contains:
+                    - the size of the crc (8/16/32)
+                    - the initial value (like -1)
+                    - the final xor value (-1, the complement)
+                    - the type (various supported)
+                    - the reverse mode during the generation of the table
+                    - the bitmask_side (0 or 1 where 1 is the most used one)
+                  default values: 0xedb88320 32 -1 -1 0 0 1
+                  if you need the classical crc16 (0xc0c1) use:
+                    encryption crc 0xa001 "16 0 0 0 0 1"
+                  or
+                    encryption crc "" 16
+                  the result is placed in the variable QUICKBMS_CRC
+                  for additional info:
+                    http://aluigi.org/bms/quickbms_crc_engine.txt
+                  for technical information about the operations check the
+                  crc_calc function in crc.c, it's quite easy to understand
+                  because it contains the simple operations performed in
+                  each cycle.
+                  note that some crc types use the polynomial value as
+                  constant in each cycle
+                EXECUTE:
+                  use KEY to specify the command to execute using #INPUT#
+                  instead of the input filename and #OUTPUT# for the output
+                  one, you can also specify a variable by using the %VAR%
+                  notation.
+                  IMPORTANT NOTE: do NOT use "encryption execute" if the
+                  output will be bigger than the input, use Clog in that case!
+                  example:
+                    encryption EXECUTE "mycrypt.exe d #INPUT# #OUTPUT#"
+                  another full example:
+                    get SIZE asize
+                    encryption EXECUTE "lame.exe -V 4 #INPUT# #OUTPUT#"
+                    log "newfile.mp3" 0 SIZE
+                    encryption EXECUTE "otherprog.exe #INPUT# #OUTPUT# %SIZE%"
+                    log "newfile2.mp3" 0 SIZE
+                CALLDLL:
+                  exactly as above except that the variables don't need to be
+                  specified within '%' because calldll already handles them,
+                  but don't worry because even if you do that the result
+                  should not change, experimental:
+                    encryption calldll "test.dll myfunction cdecl RET #INPUT# #INPUT_SIZE# MYVAR"
+                    get SIZE asize
+                    log "newfile.mp3" 0 SIZE
+                "" "", disable the encryption
+      KEY       The key to use in C notation like "\x11\x22\x33\x44" or
+                "this is my key" (cstring)
+                This value can be also a variable or a memory file
+                set ALGO and KEY to "" for disabling the encryption
+      IVEC      The ivec to use in C notation (cstring), an ivec is an
+                additional key used for increasing the security of
+                encryption algorithms that are usually defined as ECB
+                without ivec and CBC (and other names) with ivec
+      MODE      0 for decryption (default), 1 for forcing the encryption mode
+                if no ivec is used remember to place a "" at its place
+      KEYLEN    Forces the usage of a certain length of the key, this one
+                has been introduced only for avoiding the problem of using
+                a variable as KEY containing zeroes in it
+
+    Examples:
+      Encryption aes "0123456789abcdef" "" 1    # encryption without ivec
+      Log MEMORY_FILE 0 SIZE
+      Encryption aes "0123456789abcdef"         # decryption without ivec
+      Log "redecrypted_file.dat" 0 SIZE MEMORY_FILE
+      Encryption aes "\x12\x34\x56\x78"
+      set MEMORY_FILE binary "\x12\x34\x56\x78"
+      Encryption aes MEMORY_FILE
+      Encryption aes MY_VARIABLE
+      Encryption md5 ""
+
+
+.......................................................................
+
+Print MESSAGE
+
+    It prints a string in C notation with the values of the variables if
+    their names are specified between '%' chars.
+    It's also possible to specify the maximum amount of bytes to
+    visualize (or a variable containing such value) and if they must be
+    displayed in hex or dump mode specifying some flags after a '|' like
+    in the examples:
+    - x/h/hex: hexadecimal numbers and chars
+    - dump:    hexadecimal dump, left in hexadecimal and right in chars
+    - number:  amount of bytes to show
+    - var:     variable containing the amount of bytes to show
+
+    Arguments:
+      MESSAGE   C notation string, each %VAR% word is converted to its
+                value (cstring)
+
+    Examples:
+      print "the variable OFFSET of the file %FILENAME% has the value %OFFSET|x%"
+      print "this is the first line\nthis is the second line\n"
+      print "variable %VAR% and %VAR2%"
+      print "variable %VAR|h% and %VAR2|hex%"
+      print "variable %VAR|3% and %VAR2|4%"
+      print "variable %VAR|3h% and %VAR2|h4%"
+      print "variable %VAR|dump16%"
+      print "variable %VAR|dumpVARSZ%"
+
+
+.......................................................................
+
+GetArray VAR ARRAY VAR_IDX
+and
+PutArray ARRAY VAR_IDX VAR
+
+    Experimental commands to store variables in bidimensional arrays.
+    They work on a dynamic array where it's possible to store the
+    variables. Something like a temporary place or a stack.
+    It's highly suggested to pre-allocate the array if you know the
+    max value, example: PutArray 0 FILES 0
+    If the array index (VAR_IDX) is negative like -1:
+    - getarray will take the element located at that position from the
+      end of the array, so "getarray VAR 0 -1" will take the last
+      element while "getarray VAR 0 -2" will take the one before
+    - putarray will ever append the element at the end of the array,
+      currently there is no difference if you use VAR_IDX -1, -2, -1000
+
+    Examples:
+      PutArray 0 0 FIRST_VAR
+      PutArray 0 1 SECOND_VAR
+      GetArray FIRST_VAR 0 0
+      GetArray SECOND_VAR 0 1
+      for i = 0 < FILES
+        putarray 0 -1 VAR
+      next i
+
+
+.......................................................................
+
+SortArray ARRAY [ALL]
+
+    Experimental sorting of the arrays in ascending order (like 0 to 99)
+    based on the values in ARRAY.
+    If ALL is a number different than zero, the sorting will affect ALL
+    the available arrays created till that moment, which means that
+    their positions will match those of the sorted array, so if the
+    array 0 was "1" "3" "2" and array 1 "hello" "test" "bye", with ALL
+    set to 1 you will have 1 2 3 and "hello" "bye" "test".
+
+    Examples:
+      putarray 0 0 "zzz"
+      putarray 0 1 "aaa"
+      putarray 0 2 "bbb"
+      sortarray 0
+      for i = 0 < 3
+        getarray TMP 0 i
+        print "%TMP%"
+      next i
+
+
+.......................................................................
+
+CallFunction NAME [KEEP_VAR] [ARG1] [ARG2] ... [ARGn]
+StartFunction NAME
+...
+EndFunction
+
+    Calling and declaration of a function identified by NAME where the
+    values of the variables are backed up till the termination of the
+    function when they are restored.
+    It works very well for recursive/nested archives like those used by
+    "The Void" and "Another Day".
+    If KEEP_VAR is not specified or zero, QuickBMS will make a backup
+    of the current values and the function will work on a copy, when
+    the function terminates the variables will be restored to their
+    backup.
+    If KEEP_VAR is set to 1, there will be no backup and any change
+    made in the function will remain when it terminates.
+    Do not use KEEP_VAR if you are working on a nested/recursive file
+    table, use it to 1 if you are creating a macro or a function
+    called many times to perform a task.
+    It's a good idea to place all the functions (from StartFunction
+    till EndFunction) at the end of the scripts.
+    It's also possible to pass optional arguments to the function, they
+    will have the name of the function plus ARGnumber, for example:
+    MYFUNCTION_ARG1 amd MYFUNCTION_ARG2.
+    Doesn't exist a return value at the moment but it's possible to
+    do it in other ways like saving the value in an array or on a
+    MEMORY_FILE.
+
+    Arguments:
+      NAME      Name assigned to the function
+      KEEP_VAR  Set to 1 if you want to keep the content of the variables
+                without resetting them, in short words:
+                0 = for recursive functions (default)
+                1 = for normal functions that change variables,
+                    this is faster and suggested in most cases
+      ARGs      Arguments, they are seen inside the function as
+                "name of the function" + ARG + argument_number
+
+    Examples:
+      http://aluigi.org/bms/thevoid.bms
+      http://aluigi.org/bms/fear.bms
+
+
+.......................................................................
+
+ScanDir PATH NAME SIZE [FILTER]
+
+    Function without a real usage, it simply scans the PATH folder and
+    fills the NAME and SIZE variables with the name and the size of
+    each file found.
+    At the moment this function doesn't have a purpose so ignore it.
+    If you want to filter the scanned files located in the folder you
+    specified as input, use the -F option of quickbms (I tell this
+    information because some users may think to "wrongly" use this
+    command for that purpose).
+
+    Arguments:
+      PATH      Must be ".", the current folder
+                There are also some "experimental" values not meant for
+                normal usage, with optional file number after "://"
+                (for example heap://10 will work on the file number 10):
+                    process://  processes on the system: NAME=process SIZE=pid
+                    module://   modules in the opened process: NAME=address SIZE=size
+                    memory://   allocated blocks of memory: NAME=address SIZE=size
+                    heap://     every single allocated heap (slow!): NAME=address SIZE=size
+      NAME      Output variable which receives the name of the file, it
+                will be "" when there are no other files
+      SIZE      Output variable which receives the size of the file, it
+                will be -1 when there are no other files
+      FILTER    Same job as -F, this filter is valid only if -F wasn't
+                specified
+
+    Examples:
+      For
+          ScanDir "." NAME SIZE
+          if NAME == ""
+              cleanexit
+          endif
+      Next
+      ...
+      For
+          ScanDir "." NAME SIZE "*.jpg"
+          if NAME == ""
+              cleanexit
+          endif
+      Next
+
+
+.......................................................................
+
+CallDLL DLLNAME FUNC/OFF CONV RET [ARG1] [ARG2] ... [ARGn]
+
+    This is the command which allows to use plugins inside QuickBMS.
+    The idea came from the possibility of using the custom
+    decompression/decryption functions located in executables and DLLs
+    avoiding the boring reverse engineering of all the functions.
+    It works with both real files and MEMORY_FILEs (even if they contain
+    dll data!).
+    Unfortunately this is not much possible with the functions got from
+    executables where are used static variables due to some technical
+    reasons, in fact it's not possible to relocate them in memory.
+    For example if the function uses the memory between 006c0000 and
+    006d0000 it's highly possible that such range of memory is not
+    allocated or is already in use because the executable has not been
+    loaded (LoadLibrary) in its original address, that space is already
+    occupied.
+    There are no problems with the DLLs, they are made to be relocated.
+    You can even use a dll inside a MEMORY_FILE but be sure it's not
+    packed because it may not work.
+    And it's also possible to use a raw data containing maching
+    instructions, basically you can dump a function "as is" and putting
+    it in a MEMORY_FILE.
+    That means that the following situations are OK:
+    - raw dumped functions without references to API or static memory
+    - DLLs
+    - "maybe" some executables loaded as DLLs
+
+    Arguments:
+      DLLNAME   Name of the dll, executable, file or MEMORY_FILE where
+                is located the function, example "mylib.dll"
+      FUNC/OFF  It can be the name of the function to import in which
+                  case it must be exported by the dll/exe with a name
+                  (pay attention to mangled names!)
+                Or the relative offset where is located the function,
+                  remember that the relative offset is NOT the absolute
+                  one but it's the offset related to the image base of
+                  the exe/dll, so if normally the dll loads at offset
+                  10000000 and the function is at 10012345 then the
+                  offset is 0x12345
+      CONV      Calling convention, please refer to calling_convention.h:
+                  usercall: allows to set all the 6 x86 registers, any
+                    argument after 6th will be pushed on the stack
+                  cdecl: used by default in many C/C++ compiler
+                  stdcall: aka winapi, used by default in Visual C
+                  thiscall
+                  msfastcall: Microsoft fastcall
+                  fastcall: native fastcall
+                  borland: the fastcall convention used by the Borland
+                    compilers like Delphi
+                  pascall
+                  watcom
+                  safecall
+                  syscall
+                  optlink
+                  carion
+      RET       The variable which will contain the value returned by
+                the function, use "" if there is no return value.
+                If you use *RET or &RET then the return value will be
+                copied in the RET variable as a string
+      [ARGS]    All the arguments of the function, it's also possible
+                to use pointers to arguments if they are preceded by a
+                & or a * like &SIZE which means that the dll/code
+                receives the address of that variable and can modify
+                its content. It works only with numeric variables
+
+    Examples:
+      idstring LZ2K
+      get SIZE long
+      get ZSIZE long
+      log MEMORY_FILE 0xc ZSIZE
+      putvarchr MEMORY_FILE2 SIZE 0 # like malloc
+      #calldll "TransformersDemo.exe" 0x263c50 cdecl "" MEMORY_FILE MEMORY_FILE2 ZSIZE SIZE    # 00663C50
+      calldll "unlzk.dll" "unlz2k" cdecl SIZE MEMORY_FILE MEMORY_FILE2 ZSIZE SIZE
+      log "dump.dat" 0 SIZE MEMORY_FILE2
+
+
+.......................................................................
+
+Put VAR TYPE [FILENUM]
+...
+PutDString VAR LENGTH [FILENUM]
+...
+PutCT VAR TYPE CHAR [FILENUM]
+...
+
+    These commands are EXACTLY like the Get* functions except for the
+    fact that they perform write operations.
+    For using these commands on a physical file (so MEMORY_FILEs
+    excluded) the user MUST use the -w option at runtime, that's
+    necessary for both technical and security reasons.
+    If you want to write a string without the NULL delimiter use:
+    putct "your_string" string -1
+
+
+.......................................................................
+
+GetBits VAR BITS [FILENUM]
+
+    This is an experimental function for reading bits from the files.
+    When you use a GoTo function or change the current offset of the
+    file with a Get* command, the variable containing the bit position
+    (basically the amount of bits read from the previously byte taken
+    from the file) will be reset to 0.
+    Note that the function is 100% endian compatible so the result
+    changes if you choose the little or big endian mode, remember it in
+    case the results don't match what you expected.
+
+    Arguments:
+      VAR       Destination variable, can be a number if the bits are
+                from 0 to 32 or a string for bigger sizes
+      BITS      Number of bits to read
+      FILENUM   Number of the file associated to the archive (0)
+
+
+.......................................................................
+
+PutBits VAR BITS [FILENUM]
+
+    Write mode, same format as GetBits
+
+
+.......................................................................
+
+Include FILENAME
+
+    This command loads another script in the current one, it can be
+    useful if you have many general functions and you want to avoid to
+    copy&paste them in any new script.
+    You can place it in any part of your script.
+
+    include "general.bms"
+    ->
+        load the part of the current script till "include"
+        load general.bms
+        load the remaining part of the current script after "include"
+
+
+.......................................................................
+
+NameCRC VAR CRC [LISTFILE] [TYPE] [POLYNOMIAL] [PARAMETERS]
+
+    It's not rare to have archives containing files without names, just
+    a crc (checksum) calculated on the original filename to identify it.
+    The NameCRC command exists just in these situations, where you have
+    a file containing a list of filenames (maybe collected with a
+    debugger or via hooking) and you want to assign them to the output
+    files.
+    What this command does is just loading the names in LISTFILE,
+    calculating some checksums on them using the provided crc
+    parameters, and compare the CRC field read in the archive with the
+    calculated ones.
+    When a crc matches the one in the database, the original filename
+    is moved in the VAR variable.
+    Note that QuickBMS will automatically calculate various CRC for the
+    same filename, by using only slash or backslahs, or all the chars
+    to lower or upper case, by removing any "\/.:" char from the
+    beginning of the name and so on. This is necessary to grant the
+    catching of the right filename in any situation.
+    The feature is very fast and the "database" is not so big, so you
+    will notice almost no performance issues while using this command.
+
+    The function must be used before the *log operations and it can be
+    used as initializer at the beginning of the script and then with
+    only the first mandatory arguments to retrieve the filenames
+    matching the provided crc, for example:
+        namecrc DUMMY 0 "names.list" 32
+        ...
+            get NAME_CRC long
+            namecrc NAME NAME_CRC
+            log NAME OFFSET SIZE
+
+    Or you can just use it with all the arguments:
+        ...
+            get NAME_CRC long
+            namecrc NAME NAME_CRC "names.list" 32
+            log NAME OFFSET SIZE
+
+    Arguments
+        VAR     Destination variable that will contain the filename or
+                just a "" in case no name has been found (it will use
+                a particular variable called QUICKBMS_FILENAME).
+                If VAR is "" then you can use *log "" and the retrieved
+                filename will be automatically applied to the output
+                file. This behaviour has been thought to write scripts
+                easily without providing a NAME variable.
+        CRC     This is the CRC field read from the file.
+                It must be a HEXADECIMAL value, decimal are no longer
+                supported by default.
+                Remember that quickbms.exe reads longlong as a 32bit
+                field, you must use quickbms_4gb_files.exe to read real
+                64bit fields.
+                If necessary, in future will be supported also hash
+                algorithms.
+        LISTF   The name of the file that contains the filenames, each
+                name must be on a new line.
+                QuickBMS automatically recognize if the entry is just
+                the name or contains also a pre-calculated crc, for
+                example:
+                    path\folder\file.txt
+                    0x11223344  path\folder\file.txt
+                    287454020           path\folder\file.txt
+                    # path\folder\file.txt
+                The list file will be automatically searched and loaded
+                from the input and output folders, till it's found.
+                The filenames located after a comment are good to use
+                the same bms script as a file list.
+                You can also specify a memory file, useful if you have
+                set it as compressed, set MEMORY_FILE10 compressed "..."
+        TYPE    Currently only CRC is supported:
+                crc32 (default), crc8, crc16 and crc64
+        POLY    The polynomial value used to calculate the CRC tables
+        PARAM   Both POLY and PARAM work in the same way you can set
+                the CRC in the Encryption command through KEY and IVEC,
+                so refer to that command for additional information and
+                example.
+                Anyway PARAM contains:
+                BITS, INIT, FINAL, TYPE, REVER and BITMASK_SIDE
+                If you are a developer and wants to have a full
+                understanding of what you can customize, please check
+                the crc_calc function in crc.c, it's very simple and
+                self explanatory.
+
+
+.......................................................................
+
+Codepage VAR
+
+    Allows to specify a codepage/charset (number or name) for the unicode
+    operations like "getdstring VAR2 SIZE ; Set VAR1 unicode VAR2".
+    Currently it works only on Windows and the full list of codepages
+    is available at:
+    https://msdn.microsoft.com/en-us/library/windows/desktop/dd317756%28v=vs.85%29.aspx
+
+    Arguments
+        VAR     the codepage, like utf8 or 950 and so on.
+
+    Example for converting a string from JIS (932) to UTF8:
+      get NAME string           # read it as a sequence of bytes
+      codepage 932
+      set NAME to_unicode NAME  # jis -> utf16 (unicode)
+      codepage "utf8"
+      set NAME unicode NAME     # utf16 -> utf8
+
+
+.......................................................................
+
+SLog NAME OFFSET ZSIZE [TYPE] [FILENUM]
+
+    This command allows to export strings to an output file and being
+    able to reimport them later with reimport.bat.
+    The reimporting feature of this command has the same limitations of
+    the global one, so you cannot reimport strings that are longer than
+    the original.
+    Currently QuickBMS will simply tell you that the new string is longer
+    without interrupting the importing so pay attention.
+    The space between the end of the new and old string will be filled
+    with zeroes but this behaviour "may" be changed in future to avoid
+    situations in which there are sequential NULL delimited strings and
+    using zeroes will causes problems in the software that reads the
+    file. Anyway in these situations you can just insert the spaces by
+    yourself in the new string.
+    The dumped strings are handles as C strings, basically the '\' char
+    (backslash) is an escape that allows you to specify any byte you
+    desire, the \r and \n you will see are just the 0x0d and 0x0a bytes
+    that allow to insert the whole multiline string in one line.
+    Each line is an exported string.
+    Notepad++ highly suggested.
+    Small tip: Use INS (the replace character) mode of your text editor
+    for editing the string file to reimport so that you will have no
+    problems with longer new strings.
+    The SLog function is new so any feedback and suggestion is highly
+    appreciated.
+
+    Arguments:
+        NAME    Name of the output file. It will be created from scratch
+                the first time and then will be used in append mode from
+                the second line on. Automatic, simple and error-proof.
+                The output file is just in UTF-8 with Windows line feeds
+                ("\r\n") and the conversion of unicode strings is performed
+                by QuickBMS automatically with the codepage in use
+        OFFSET  The offset where is located the string you want to dump.
+                >=0 works just like the other *log commands and dumps
+                    the string located at that OFFSET, it doesn't change
+                    the current offset
+                <0  dumps the string at the current offset and updates it,
+                    so it advances in the file
+        SIZE    >=0 it works just like the Getdstring command allowing
+                    you to dump a string of a certain amount of bytes
+                <0  just like the Get command
+        TYPE    This is the type of data to read just like the Get
+                command, if not specified it's considered String. You can
+                dump most of the types and even the non-string ones so if
+                you use the Long type you will have the decimal value easy
+                to edit inside the output file
+        FILENUM the input file
+
+    Examples:
+      # the test file is available here http://aluigi.org/bms/slog_test.dat
+      set STRINGS_FILE string "strings.txt"
+      slog STRINGS_FILE -1 0xb string
+      slog STRINGS_FILE -1 -1
+      slog STRINGS_FILE -1 -1 long
+      endian big
+      #slog STRINGS_FILE -1 -1 unicode
+      slog STRINGS_FILE -1 0x18 unicode
+      slog STRINGS_FILE 0x2e -1
+
+
+.......................................................................
+
+QuickBMS can handle also some minimalistic and experimental C
+structures like:
+
+  debug 1     # needed to show the collected information
+  struct test {
+    int       var1;
+    char      var2;
+    char      *mystring;
+    uint8_t   data[10];
+  }
+
+These operations are all converted to Get* commands while they are
+converted in Put* if there is a '=' after them, like:
+
+  debug 1
+  struct test {
+    int       var1 = 0x11111111;
+    char      var2 = 0x22;
+    char      *mystring = "hello";
+    uint8_t   data[10] = OTHER_VAR;
+  }
+
+Maybe in future versions it could be improved but at the moment it's
+tagged as an experimental and alternative feature only in case you
+don't know the bms syntax or it takes time to convert a C struct in
+bms language.
+
+Example of -s option, zlib decompression in one command-line without
+using script files:
+
+  quickbms -s "comtype zlib ; get ZSIZE asize ; xmath SIZE \"ZSIZE * 10\" ; clog \"dump.dat\" 0 ZSIZE SIZE" "" input_file.dat output_folder
+
+
+#######################################################################
+
+================================================
+5) Experimental input and output, other features
+================================================
+
+
+A] Experimental input and output
+--------------------------------
+
+From version 0.5.1 of QuickBMS I started to implement some alternative
+input/output methods.
+At the moment these alternatives cover the following operations:
+
+- Network socket operations specified by an URL like udp:// and tcp://
+  so the tool can be used to send custom packets and data via TCP and
+  UDP to one or more network hosts.
+  Required command-line option: -n or -network
+  URL format:
+    tcp://host:port
+    tcp://host:port,ssl,force_new_socket
+
+- Process operations specified by an URL like process:// or memory://
+  and allow to read and write the various processes running on the
+  system.
+  Required command-line option: -p or -process
+  URL format:
+    process://process_name
+    process://pid
+    process://pid:module_name
+
+  Experimental debug mode available by adding "debug" after the
+  parameters: process://pid/debug
+  In this way the process will be debugged by QuickBMS and when
+  there is a breakpoint or an exception the process will be freezed
+  and all the registers dumped in variables with their names.
+  additionally QuickBMS will keep in memory all the INT3 you set
+  and automatically restore them when you want to continue the
+  execution.
+  You can find an example script here:
+    http://aluigi.org/bms/simraceway_getkey.bms
+
+- Audio operations specified by an URL like audio:// or wave://
+  and allow to record audio from the default input device (like
+  microphone) and play.
+  Currently the "device" parameter is not used.
+  Required command-line option: -A or -audio
+  URL format:
+    audio://device,sample_rate,channels,bits
+
+- Video operations specified by an URL like video:// or graphic://
+  and allow to grab the screen and display the images.
+  set window_name to null or none for using the whole screen in read
+  mode.
+  Required command-line option: -g or -video
+  URL format:
+    audio://window_name,width,height,bits
+
+- Windows messages specified by an URL like winmsg:// but at the moment
+  it's possible only to send messages and using 3 long numbers:
+  message, wparam and lparam.
+  Required command-line option: -m or -winmsg
+  URL format:
+    winmsg://window_name
+
+
+I had this crazy idea in my mind for over one year and I decided to
+implement it now just because it's completely crazy and can work only
+if the user uses the needed options at command-line for security
+reasons.
+
+After all QuickBMS implements a lot of algorithms so for me it's a lot
+more comfortable to be able to use it for my tests with the network
+data and I guess some modders could find useful the process operations
+for dumping textures and other models directly from the memory.
+Anyway keep in mind that this is all experimental stuff.
+
+The following is an example script for the network operations:
+
+  log MEMORY_FILE 0 0
+  put 0x11111111 long MEMORY_FILE
+  put 0x22222222 long MEMORY_FILE
+  put 0x33333333 long MEMORY_FILE
+  put "hello" string MEMORY_FILE
+  put 0x44444444 long MEMORY_FILE
+  get SIZE asize MEMORY_FILE
+  log "tcp://127.0.0.1:1234" 0 SIZE MEMORY_FILE
+  log "udp://localhost:1234" 0 SIZE MEMORY_FILE
+
+or
+
+  log MEMORY_FILE 0 0
+  put "GET / HTTP/1.0" line MEMORY_FILE
+  put "User-Agent: Mozilla" line MEMORY_FILE
+  put "Referer: http://localhost/test.htm" line MEMORY_FILE
+  put "" line MEMORY_FILE
+  get SIZE asize MEMORY_FILE
+  log "tcp://127.0.0.1:80" 0 SIZE MEMORY_FILE
+
+Command-line:
+  quickbms -n script.bms "" ""
+
+While the following is a simple HTTP download that can be used with
+  quickbms -n script.bms "tcp://aluigi.org:80" "" > output.htm
+
+  get HOST filename
+  string HOST p= "Host: %s" HOST
+  put "GET / HTTP/1.1" line
+  put HOST line
+  put "User-Agent: Mozilla" line
+  put "Connection: close" line
+  put "" line
+  for
+      get DATA line
+      print "%DATA%"
+  next
+
+Funny example that inverts the colors of the first notepad window:
+
+  set NAME string "video://notepad"
+  open "" NAME
+  get SIZE asize
+  filexor 0xff
+  log NAME 0 SIZE
+
+Launch notepad and then run:
+  quickbms -g script.bms "" ""
+
+How to close Firefox:
+  put 18 long   # WM_QUIT
+  put 0 long    # wParam
+  put 0 long    # lParam
+
+  quickbms -m script.bms "winmsg://firefox" ""
+
+In future I could decide to add other operations and I'm interested in
+any other idea.
+
+
+
+B] Other features
+-----------------
+
+Other experimental features are the support of most of the commands
+used in templates of WinHEX:
+http://www.x-ways.net/winhex/templates/index.html
+
+Usually these templates work immediately while sometimes it's necessary
+only to separate some arguments manually like "arg1""arg2" to
+"arg1" "arg2".
+
+QuickBMS has also the great feature of dumping an HTML file with the
+parsed format highlighted through the option -H.
+This is a very cool feature that can help many people and doesn't
+require additional modifications, just use the original BMS scripts as
+usual.
+Unfortunately the generated HTML file is not optimized yet and so it
+takes lot of memory and CPU to be loaded.
+
+The QuickBMS process supports some return code numbers used when the
+tool terminates due to a success or a fail, you can find the list at
+the beginning of src\defs.h.
+QUICKBMS_OK (success) is ever 0 while QUICKBMS_ERROR_* are referred to
+problems.
+
+
+
+C] Modkit distribution of quickbms.exe
+--------------------------------------
+
+In response to a request of a modder, I have decided to add a simple
+feature to allow modders and modkits developers to embed a script in
+quickbms.exe when they distribute it in their products, so the user
+will not be asked to select the script.
+
+How to do it:
+
+- open quickbms.exe with a hex editor
+- search the string "SET THIS BYTE X TO 0X00"
+- replace the 'X' with 0x00:
+  53 45 54 20 54 48 49 53 20 42 59 54 45 20 58 20   SET THIS BYTE X
+  53 45 54 20 54 48 49 53 20 42 59 54 45 20 00 20   SET THIS BYTE  
+
+- upx.exe -9 quickbms.exe
+
+- copy /b  quickbms.exe  +  script.bms   output.exe
+
+That's all, anyway if you want to use the "classical" way and being
+able to specify options, input file and output folder, it's better to
+use the BAT solution with the -G option for the GUI mode:
+
+  EXTRACT.BAT:
+    quickbms.exe -G OPTIONS SCRIPT INPUT OUTPUT
+
+
+
+#######################################################################
+
+========
+6) Notes
+========
+
+
+The following are some exceptions in the usage of QuickBMS.
+They are not real bugs, rather they are things that can't work (at
+least at the moment) due to the very flexible nature of the tool or
+things that it's useful or interesting to know:
+
+? (partially solved)
+  Number and strings, due to the usage of the optimizations the following
+  script will NOT result in "mytest46600x12349999999999", the result will
+  be "mytest4660-1717986919":
+    set NAME string "mytest"
+    set NUM long 0x1234
+    string NAME += NUM
+    print "%NAME%"
+    set NUM string "0x12349999999999"
+    string NAME += NUM
+    print "%NAME%"
+  This is a good compromise because the previous situation is very very
+  "rare" and in any case can be bypassed using multiple "string NAME += chr"
+  and the gain in performance is incredible for the multiple in-script
+  operations, so this is the best solution.
+  Additionally you can use the printf-like string command and the binary
+  type with Set:
+    set NAME string "mytest"
+    set NUM1 long 0x1234
+    set NUM2 binary "0x12349999999999"
+    string NAME p= "%s0x%x%s" NAME NUM1 NUM2
+    print "%NAME%"
+
+- Any Clog operation with a compressed or uncompressed size minor/equal
+  than zero produces a file with a zero size, but this is not a problem
+  of the tool because it's the perfectly logical behavior in these
+  situations.
+  If it's necessary to use a compression which gets the SIZE value
+  automatically (like base64 or stalker_lza) is enough to specify the
+  compressed size as uncompressed size:
+    clog NAME OFFSET ZSIZE ZSIZE
+  or
+    clog NAME OFFSET ZSIZE 1
+
+- The tool has been created to be 100% compatible with the original
+  MexScript language and its syntax/logic, so I tried to add not many
+  new commands and, if possible, providing an alternative using
+  the original set of commands (for example the Strlen command and
+  "Set VAR strlen VAR").
+  I tried also to maintain the logic of the program (for example
+  encryptions and compressions applied in the file operations only).
+  So if something looks complex or senseless, it has been made for
+  matching the original structure and logic of the scripting language.
+
+- QuickBMS grants compatibility with the original MexScript language
+  that implements also some static and partially undocumented variables
+  like:
+    EXTRCNT, BytesRead, NotEOF, SOF, EOF
+  If you are writing a script for QuickBMS try to avoid these variable
+  names except if you really need and know what they do.
+
+- QuickBMS uses many third party code and, even if I tried to adjust
+  them a bit where possible, unfortunately many of these external
+  functions were a disaster or missed any security requirement.
+  That's the reason why the comtype scanning feature causes so many
+  crashes with invalid data.
+  From version 0.5.5 I added a particular type of allocation management
+  that allows a better debugging of the code and at the same time
+  protects the heap from contiguous buffer overflow and underflow
+  (so it can do nothing against "buff[0x11223344] = 'a').
+  It's not a solution but at least helps me a lot and limits the
+  problems caused by third party non-safe code.
+  The only protection of the stack is provided by the
+  -fstack-protector-all compiler option of Gcc.
+
+- Security:
+  It's hard to make the tool completely safe, anyway the following are
+  some notes and solutions:
+  - allocated memory set as read/write only with guarded page before and
+    after the buffer, they act like a "cage" that delimits the buffer
+  - usage of Gcc -fstack-protector-all
+  - the user is EVER prompted of activating dangerous features like the
+    usage of dlls and the calling of external executables
+  - some checks to avoid the problems caused by the big redundant code
+    of which QuickBMS is full (unfortunately, sorry for that)
+  - keep in mind that QuickBMS is mainly a testing tool in which I
+    preferred to insert strange and particular features rather than
+    making it "secure" for any user, it's the responsibility of the user
+    to use only trusted scripts and paying attention to the warnings
+    displayed by the tool
+
+- The EXECUTE mode of ComType and Encryption will grant compatibility
+  with any compression and encryption tool (command-line) based on
+  algorithms not yet supported by QuickBMS, and at the same time avoids
+  the rush of trying to implement "everything" as soon as possible.
+  I used system() for this command just because I want that it's
+  compatible with any possible program included those which require
+  input from stdin and output to console (stdout).
+  Example: "file.exe < #INPUT# > #OUTPUT#"
+
+? (partially solved)
+  All the extracted files are loaded completely in memory before being
+  dumped for various technical reasons, so if the file to dump has a
+  size of 800 megabytes this is the same size which will be allocated
+  in memory or even double or more if the file must be decompressed, so
+  it's good to have a good amount of free RAM when handling big archives
+  or at least a good virtual memory/swap space.
+  This mechanism is not used for files that don't require encryption
+  and compression in which case the operation is performed 1:1 using
+  a temporary buffer of only 1 megabyte.
+
+x (SOLVED!)
+  Log "123.txt" OFFSET SIZE
+  It creates the file 123 and not 123.txt, this happens because "123.txt"
+  is considered a constant number due to the rule that everything
+  starting with a number (or a '-') is handled as a constant number.
+  This behavior didn't happen with the previous versions of the tool
+  because wasn't used the number optimization which saves tons of CPU
+  cycles in some scripts.
+  * From version 0.3.12 I decided to implement the full verification of
+    the string to know if it's a number or a string, luckily there is
+    almost no loss of performances
+
+x (SOLVED!)
+  The following do NOT work because the QuickBMS variables are case INsensitive:
+  if SIGN == "test"     # u== is the same
+  elif SIGN == "TeSt"
+  ...
+  set SIGN1 binary "test"
+  set SIGN2 binary "TeSt"
+  if SIGN == SIGN1      # u== is the same
+  elif SIGN == SIGN2
+  ...
+  The only way to fix it would be to make quickbms case SENSITIVE, this
+  change should give no problems if you have written the scripts correctly
+  but exists a 1% of possible issues, currently I don't know what to do.
+  .
+  * From QuickBMS 0.5.31 you can use the -I option to force the case
+    sensitive mode on variable names
+
+x (SOLVED!)
+    set NAME string MEMORY_FILE
+    log NAME 0 0
+  It produces no physical file because it's considered a MEMORY_FILE, it
+  happens because the dumping function receives "MEMORY_FILE" as output
+  file name.
+  At the moment there is no fix anyway it's a very very rare event
+  (never happened to find an archive containing a file with that name)
+  and so not a priority.
+  * Fixed in version 0.5.17 by checking if the name of the file is the
+    name of a variable or its content.
+
+x (SOLVED!)
+  Crash caused by HsSrv.dll.
+  The Asus Xonar and Unixonar drivers cause the crash of QuickBMS for the
+  following reason: HsSrv.dll is automatically injected in any process
+  and this dll checks all the allocated memory for the presence of a "MZ"
+  signature (the one used for the executables):
+    1000B462  CALL DWORD PTR DS:[<&KERNEL32.VirtualQuery>]
+    1000B468  TEST EAX,EAX
+    1000B46A  JBE SHORT 1000B4BE
+    1000B46C  CMP DWORD PTR SS:[EBP-24],1000    ; check if State is MEM_COMMIT
+    1000B473  JNE SHORT 1000B48B
+    1000B475  TEST WORD PTR SS:[EBP-20],0100    ; check if Protect contains PAGE_GUARD
+    1000B47B  JNZ SHORT 1000B48B
+    1000B47D  AND DWORD PTR SS:[EBP-4],00000000
+    1000B481  CMP WORD PTR DS:[ESI],5A4D        ; check if the buffer starts with MZ
+  QuickBMS uses a particular memory protection mechanism that in the
+  recent versions switched from PAGE_GUARD to PAGE_NOACCESS, that's
+  why HsSrv.dll crashes: if Protect contains PAGE_GUARD then it skips the
+  MZ check but now it's PAGE_NOACCESS.
+  Using MEM_COMMIT | MEM_RESERVE doesn't help to skip the code with the
+  first check because VirtualQuery returns only MEM_COMMIT.
+  Asus should fix the bug by checking if Protect is set to a non-readable
+  flag, I have NOT contacted them.
+  Some possible solutions are the following:
+  - disable the GX mode (emulated EAX) of the Asus driver
+  - disable the Asus HookSupport Manager application (HsMgr.exe)
+  - start QuickBMS with the -9 option (create a shortcut)
+  - contact Asus! :)
+  Note that the problem seems to happen only when QuickBMS is launched
+  with the GUI (double-click) while it's calling the Windows API
+  GetOpenFileName.
+  * From version 0.5.25c I use PAGE_GUARD to avoid any problem with
+    buggy third party drivers.
+
+? When you assign a string to a variable pay attention to the backslash
+  char: \
+  It's used as escape when parsing the bms script and a quoted string
+  is found, like "test".
+  The only limitation is caused by the presence of the same quote char
+  after the backslash so the following command is wrongly interpreted:
+    string VAR R "test1 and test2\" "/"
+  In that case the \" is interpreted as " without terminating the
+  handling of the quote string.
+  For that specific case there is no solution at the moment because
+  \\ is interpreted as \\ and not as \.
+  Consider that this is a very rare case and if you want to replace
+  the backslash with slashes it's enough to use:
+    string VAR R \ /
+
+
+Other things to know or strange behaviors will be listed when I will
+figure and remember them.
+
+A curiosity for who is crazy for the optimizations of the compilers:
+the PPMD (ppmd var.i rev.1) algorithm compiled with -O3 (Gcc) is a lot
+slower than if compiled with -O2 and a similar situation is valid also
+for other algorithms.
+With -Os the code is smaller (about 300kb the Windows exe of an old
+quickbms version) but there is a loss of performances of max 15/20%
+with some algorithms (like PPMD) and scripts with many get/putvarchr
+and math operations.
+
+
+#######################################################################
+
+==========
+7) Support
+==========
+
+
+QuickBMS, like many of my projects, is fully supported by me and is
+ever in active development for adding new encryption and compression
+algorithms, adding new features, fixing bugs and other improvements.
+I'm the first and biggest user of this tool, so I have a direct
+interest in maintaining it.
+
+The latest version is available on the following website:
+
+  http://quickbms.aluigi.org
+
+RSS feeds available on my website so stay tuned for any update of
+QuickBMS and my other tools:
+
+  http://aluigi.org/rss.php
+
+Remember to contact me for any doubt or new idea regarding QuickBMS
+by e-mail at me@aluigi.org
+
+You are also invited to post your doubts, feedback and suggestions on
+the official support forum called ZenHAX: http://zenhax.com
+It's a community where the users can write about game research, file
+format reversing, game internals and security.
+
+My old forum on http://forum.aluigi.org is no longer supported from
+2011 but it contains some additional old information and examples.
+
+QuickBMS is a free project, no donations or money are accepted.
+If you like it feel free to spread the word about it.
+You may also like to make tutorials and videos, they are welcome so
+more people can learn to use it.
+
+QuickBMS wants to be THE EXTRACTION TOOL for almost any game related
+task so "help it to help yourself" :)
+
+
+#######################################################################
+
+=====================
+8) Additional credits
+=====================
+
+
+QuickBMS uses various public-domain code and code released under
+GPL/LGPL or other open source and free licenses.
+
+Compression:
+- zlib, inflateback9 (for deflate64) and blast of Jean-loup Gailly and
+  Mark Adler http://www.zlib.net
+- LZO of Markus F.X.J. Oberhumer http://www.oberhumer.com/opensource/lzo/
+- LZSS, LZARI, LZHUF of Haruhiko Okumura
+- unlzx.c of Erik Meusel
+- LZMA and LZMA2 of Igor Pavlov http://www.7-zip.org
+- bzip2 of Julian Seward http://www.bzip.org
+- ascii85 partially derived from http://www.stillhq.com/svn/trunk/ascii85/decode85.c
+- libmspack of Stuart Caie http://www.cabextract.org.uk/libmspack/
+- lzjb from http://cvs.opensolaris.org/source/xref/onnv/onnv-gate/usr/src/uts/common/fs/zfs/lzjb.c
+- iMatix SFL compression http://download.imatix.com/pub/
+- UCL of Markus F.X.J. Oberhumer http://www.oberhumer.com/opensource/lzo/
+- code from the uncompress utility of "The Regents of the University of California"
+- Dynamic Markov Compression implementation of Gordon V. Cormack
+  http://plg1.cs.uwaterloo.ca/~ftp/dmc/dmc.c
+- many algorithms from ScummVM http://scummvm.sourceforge.net
+- bpe of Philip Gage http://www.csse.monash.edu.au/cluster/RJK/Compress/bpd.c
+- QuickLZ of Lasse Mikkel Reinhold http://www.quicklz.com
+- Quake 3 Huffman code of Id Software http://www.idsoftware.com
+- mszh from the LossLess Codec Library
+- Doom Huffman code from the Doom/Hexen source code
+- aPLib of Jorgen Ibsen http://www.ibsensoftware.com/products_aPLib.html
+- LZF of Marc Alexander Lehmann http://home.schmorp.de/marc/liblzf.html
+- LZ77 of Arkadi Kagan http://compressions.sourceforge.net/about.html
+- LZRW algorithms of Ross Williams http://www.ross.net/compression/
+- an Huffman implementation of Bill Demas on LDS
+- the FIN algorithm (useless and very close to LZSS) on LDS
+- LZAH/LZH12/13 of Dik T. Winter http://homepages.cwi.nl/~dik/english/ftp.html
+- GRZipII/libGRZip of Grebnov Ilya (only the win32 code is linked to it)
+  because it's composed by many files and it's not a priority)
+- rle of Chilkat Software http://www.chilkatsoft.com/chilkatdx/ck_rle.htm#source
+- Quad of Ilia Muraviev http://quad.sourceforge.net
+- Balz of Ilia Muraviev http://balz.sourceforge.net
+- unshrink of Info-Zip http://www.info-zip.org/UnZip.html
+- PPMd algorithms of Dmitry Shkarin http://compression.ru/ds/
+- BriefLZ of Jorgen Ibsen http://www.ibsensoftware.com/download.html
+- PAQ6 of Matt Mahoney http://cs.fit.edu/~mmahoney/compression/paq.html#paq6
+- shcodec of Simakov Alexander http://webcenter.ru/~xander/
+- hstest of tom ehlert
+- SixPack of Philip G. Gage
+- ashford of Charles Ashford
+- JCALG1 of Jeremy Collake http://www.bitsum.com/jcalg1.htm
+- jam/unjam of W. Jiang
+- lzhlib of Haruhiko Okumura and Kerwin F. Medina for the adaptation of the code
+- Srank P M Fenwick http://www.cs.auckland.ac.nz/~peter-f/FTPfiles/srank.c
+- Zziplib/Zzlib of Damien Debin http://damiendebin.net/archives/zzip/download.php#zzlib
+- scpack of Philip Gage
+- rle3 and bpe2:
+  http://musyozoku211.blog118.fc2.com/blog-entry-13.html
+  http://blog-imgs-17.fc2.com/m/u/s/musyozoku211/bpe2.txt
+  http://blog-imgs-17.fc2.com/m/u/s/musyozoku211/rle3.txt
+- Basic Compression Library of Marcus Geelnard http://bcl.comli.eu
+- SCZ of Carl Kindman http://scz-compress.sourceforge.net
+- szip of HDF Group http://www.hdfgroup.org/doc_resource/SZIP/
+- sr3c of Kenneth Oksanen http://cessu.blogspot.com
+- Huffman library of Douglas Ryan Richardson http://huffman.sourceforge.net
+- SFastPacker of Aleksey Kuznetsov http://www.utilmind.com/delphi3.html
+- lz77wii of Hector Martin http://wiibrew.org/wiki/Wii.py
+- prs 8ing code posted by tpu http://forum.xentax.com/viewtopic.php?p=30387#p30387
+- puyo compressions of not.nmn and nickwor https://github.com/nickworonekin/puyotools
+- falcom compression of http://www.geocities.jp/pokan_chan/
+- cpk of hcs http://hcs64.com/files/utf_tab04.zip
+- DSDecmp/goldensun/luminousarc of Barubary http://code.google.com/p/dsdecmp/
+- pglz_decompress PostgreSQL Global Development Group http://www.postgresql.org/
+- SLZ: versions of Adisak Pochanayon and CUE
+- LZH-Light of Sergey Ignatchenko ftp://66.77.27.238/sourcecode/cuj/1998/cujoct98.zip
+- d3101 of Advanced Hardware Architectures/HP
+- squeeze (R. Greenlaw, Amiga port by Rick Schaeffer ???)
+- some algorithms of Mark Nelson & Jean-loup Gailly from The Data Compression Book
+- Ed Ross Data Compression
+- ilzr of Jose Renau Ardevol
+- some code from the C User's Journal
+- dmc by T.L. Yu
+- 'Uses libLZR by BenHur' http://www.psp-programming.com/benhur/
+- lzs of Matthew Chapman http://www.rdesktop.org
+- yaz0 of thakis (http://www.amnoid.de/gc/)
+- RNC by Jon http://www.yoda.arachsys.com/dk/
+  or a fork made by Simon Tatham
+- PAK_explode of Cyril VOILA
+- The KENS Project Development Team
+- dragonballz by Geoffrey W. Curtis
+- unstargun by Adam Nielsen / The_coder
+- ntcompress from Nintendo Wii Revolution SDK
+- crle of Arkadi Kagan http://compressions.sourceforge.net/about.html
+- CTW by Frans Willems http://www.ele.tue.nl/ctw
+- DACT by Roy Keene http://www.rkeene.org/oss/dact/
+- algorithms by Brendan G Bohannon http://bgb-sys.sourceforge.net
+- lzpxj by Ilia Muraviev and Jan Ondrus http://sourceforge.net/projects/lzpx/
+- rle from ftp://ftp.elf.stuba.sk/pub/pc/pack/mar.rar
+- rle from http://gdcm.sourceforge.net
+- dict from http://freearc.org/download/research/dict.zip
+- rep from http://freearc.org/download/research/rep.zip
+- lzp by Dmitry Shkarin http://www.compression.ru/ds/lzp.rar
+- kzip by Ken Silverman http://advsys.net/ken/utils.htm
+- enet http://enet.bespin.org
+- eduke32 http://eduke32.com
+- xu4 - Ultima IV recreated http://sourceforge.net/projects/xu4/
+- Lemur http://www.lemurproject.org
+- lzfu by Dave Smith and Carl Byington http://www.five-ten-sg.com/libpst/
+- he3 by Eric Prevoteau http://savannah.nongnu.org/projects/dctc/
+- Ultima Iris http://www.iris2.de http://ultimairis.sourceforge.net
+- http://sourceforge.net/projects/linux-ntfs/
+- pdb2txt http://code.google.com/p/pdb2txt/
+- Comprlib http://sourceforge.net/projects/comprlib/
+- prs by Fuzziqer http://www.fuzziqersoftware.com/projects.html
+- sega_lz77 converted from an ICE decompression tool developed by
+  scriptkiddie (XentaX's forum)
+- saint_seya compression by MrAdults (Senor Casaroja's Noesis)
+  http://forum.xentax.com/viewtopic.php?p=52279#p52279
+- lz4 by Yann Collet https://github.com/Cyan4973/lz4
+- Snappy http://google.github.io/snappy/
+- Lunar compression dll by FuSoYa http://fusoya.eludevisibility.org
+- lzv1 by Hermann Vogt
+- FastLZ by Ariya Hidayat http://fastlz.org
+- zax http://code.google.com/p/zax/
+- data-shrinker by fusiyuan http://code.google.com/p/data-shrinker/
+- mmini by Adam Ierymenko http://code.google.com/p/mmini/
+- clzw by Vladimir Antonenko http://code.google.com/p/clzw/ - http://sourceforge.net/projects/clzw/
+- lzham by Richard Geldreich https://github.com/richgel999/lzham_codec
+- lpaq8 by Matt Mahoney http://www.cs.fit.edu/~mmahoney/compression/
+- sega_lzs2 by Treeki
+- Core Online decompression by Ekey http://www.progamercity.net
+- lzlib http://lzip.nongnu.org/lzip.html
+- some compression tools from http://www.romhacking.net
+- pucrunch by Pasi 'Albert' Ojala
+- libzpaq by Matt Mahoney http://mattmahoney.net/dc/zpaq.html
+- zyxel-revert http://git.kopf-tisch.de/?p=zyxel-revert
+- Blosc https://github.com/Blosc/c-blosc
+- Gipfeli by Jyrki Alakuijala https://github.com/google/gipfeli
+- Crush by Ilya Muravyov http://sourceforge.net/projects/crush/
+- Yappy https://raw.github.com/richard-sim/Compression-Test-Suite/master/CompressionSuite/Yappy/yappy.cpp
+- liblzg by Marcus Geelnard http://liblzg.bitsnbites.eu/
+- Doboz by Attila T. Afra https://bitbucket.org/attila_afra/doboz
+- XPK http://www.jormas.com/~vesuri/xpk/
+- http://www.amiga-stuff.com/crunchers-download.html
+- http://aminet.net/package/util/libs/ulib4271
+- PackFire by Neural http://www.pouet.net/prod.php?which=54840
+- Matt Mahoney for various compression algorithms
+- http://blog-imgs-17.fc2.com/m/u/s/musyozoku211/bpe.txt
+- CBPE by Izaya http://izaya.blog38.fc2.com/blog-entry-374.html
+- Alba by xezz http://encode.ru/threads/1874-Alba?p=36612&viewfull=1#post36612
+- http://download.wcnews.com/files/documents/sourcecode/shadowforce/transfer/asommers/mfcapp_src/engine/compress/
+- QFS https://raw.githubusercontent.com/wouanagaine/SC4Mapper-2013/master/Modules/qfs.c
+- Zen Studios decompression by Ekey http://www.progamercity.net
+- OpenXRay https://github.com/OpenXRay/xray-16/blob/master/src/xrCore/LzHuf.cpp
+- ZSTD https://github.com/Cyan4973/zstd
+- AZO http://www.altools.com/ALTools/ALZip/Egg-format.aspx
+- PowerPacker from libsidtune https://github.com/bithorder/sidplayer/blob/master/jni/libsidplay2/sidtune/PP20.cpp
+- Nintendo DS/GBA compressions by CUE http://www.romhacking.net/utilities/826/
+- pclzfg http://www.embedded-os.de/en/pclzfg.shtml
+- Heatshrink https://github.com/atomicobject/heatshrink
+- TurboRLE https://github.com/powturbo/TurboRLE
+- Smaz https://github.com/antirez/smaz
+- lzfx http://code.google.com/p/lzfx/
+- Pithy https://github.com/johnezang/pithy
+- libzling https://github.com/richox/libzling
+- Density https://github.com/centaurean/density
+- Brotli https://github.com/google/brotli
+- code by Gerald Tamayo
+- libcsc
+- libbsc http://libbsc.com/
+- Shoco https://ed-von-schleck.github.io/shoco/
+- WFLZ https://github.com/ShaneWF/wflz
+- FastAri https://github.com/davidcatt/FastARI
+- Dicky https://github.com/jedisct1/Dicky
+- Squish https://github.com/Bananattack/squish
+- lzjody https://github.com/jbruchon/lzjody
+- ms-compress https://github.com/coderforlife/ms-compress
+- yay0dec by thakis http://www.amnoid.de/gc/
+- dmsdos http://cmp.felk.cvut.cz/~pisa/dmsdos/
+- iROLZ http://ezcodesample.com/rolz/rolz_article.html
+- Mcomp http://msoftware.co.nz
+- SimPE http://sims.ambertation.de/
+- Adam Nielsen for Camoto http://www.shikadi.net/camoto
+- OpenKB http://openkb.sourceforge.net/
+- OpenTitus http://opentitus.sourceforge.net/
+- deLZW http://cnub.ddns.net/deLZW.ashx
+- various pseudocode from http://www.shikadi.net/moddingwiki/Category:Compression_algorithms
+- Ladislav Zezula for PKLib
+- Marc Winterrowd http://nodling.nullneuron.net/ultima/ultima.html
+- tkatchev https://bitbucket.org/tkatchev/yalz77
+- LZ5 https://github.com/inikep/lz5
+- LZKN https://github.com/lab313ru/lzkn
+- LZSS http://www.metroid2002.com/retromodding/wiki/LZSS_Compression
+- SynLZ https://raw.githubusercontent.com/synopse/mORMot/master/SynLZ.pas
+- PPMZ2 http://www.cbloom.com/src/ppmz.html
+- OpenDark http://sourceforge.net/projects/dark/
+
+Encryption:
+- all the algorithms provided by OpenSSL http://www.openssl.org
+- xtea from PolarSSL http://www.polarssl.org
+- some encryption algorithms from GnuPG and libgcrypt http://www.gnupg.org
+- ICE of Matthew Kwan http://www.darkside.com.au/ice/index.html
+- Rotor module from the Python source code
+- http://mcrypt.sourceforge.net
+- all the various public algorithms implemented in version 0.4.1 like
+  3way, anubis, gost, skipjack and so on
+- libkirk of Draan http://code.google.com/p/kirk-engine/
+- PC1 Encryption Algorithm of Alexander Pukall http://membres.multimania.fr/pc1/
+- LibTomCrypt https://github.com/libtom/libtomcrypt
+- LibTomMath https://github.com/libtom/libtommath
+- libmcrypt http://sourceforge.net/projects/mcrypt/files/Libmcrypt/
+- sphlib http://www.saphir2.com/sphlib/
+- cityhash https://code.google.com/p/cityhash/
+- xxhash https://github.com/Cyan4973/xxHash
+- qLibc https://github.com/wolkykim/qlibc
+- StormLib https://github.com/ladislav-zezula/StormLib
+
+Others:
+- MemoryModule of Joachim Bauch https://github.com/fancycode/MemoryModule
+- various signatures from http://mark0.net/soft-trid-e.html
+- various signatures from http://toorcon.techpathways.com/uploads/headersig.txt
+- Ollydbg disasm library http://www.ollydbg.de
+- optional BeaEngine dissassembler library http://www.beaengine.org
+  (maybe will be used in future, not now)
+- uthash and utlist http://troydhanson.github.io/uthash/
+
+Notes:
+
+- Some (many?) of the original codes have been modified a bit to make
+  them usable in QuickBMS for the memory2memory (aka in-memory)
+  decompression and for other possible fixes or for decreasing the
+  amount of code, for example removing the compression routine leaving
+  only the decompression one.
+  Note that I avoided to make this third-party code more secure because
+  it's not the job of QuickBMS, so almost all the code (except some
+  rare cases) has been used "as-is", the only security protections come
+  from the general protection mechanisms adopted in QuickBMS like my
+  own heap handling and -fstack-protector-all.
+
+- The files/libraries which have been modified have the header
+  "// modified by Luigi Auriemma" which is meant just to show that it's
+  not the 100% original code and it must be NOT considered like a
+  credit.
+  I claim nothing about them, the original license and authors are
+  still untouched.
+
+- If the files have been modified or don't have the original license
+  information (may happen only with small functions that didn't contain
+  a license header in origin) please follow the provided links for more
+  details.
+
+- Almost all the algorithms implemented here have been selected by me
+  because they:
+  - have been used
+  - "may" have been used
+  - it has been claimed to have been used
+  in real software and games, or they are enough known and famous to
+  deserve their implementation in QuickBMS.
+  Personally I prefer to have many algorithms implemented also to help
+  my compression and encryption scanners: comtype_scan2.bat/bms and
+  encryption_scan.bat/bms).
+
+- Tell me if I forgot someone or something in this section, my memory
+  and level of attention are quite ridiculous so it's highly possible
+  that some credits are not complete.
+  And tell me also if it's necessary to include other files or comments
+  inside these third-party files or about them.
+  I included the list to the original websites as additional reference
+  also for having more information about their license in case the
+  included files don't have it in their comments (/* */)
+
+
+#######################################################################
