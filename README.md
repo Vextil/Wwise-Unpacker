@@ -1,10 +1,7 @@
 # Wwise-Unpacker
 Unpack game audio Wwise files (pck, bnk)
 
-**This guide is for Windows-64bit only!** I'll be using the game Life is Strange as an example.
-
-Before starting you will need the game (which I guess you already have), some tools, and scripts I wrote to automate most of the process. 
-Download this repo and unzip it somewhere you like.
+**This guide is for Windows-64bit only!** I'll be using the game Life is Strange *as an example*.
 
 Here's the archive structure:
 
