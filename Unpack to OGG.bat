@@ -1,3 +1,8 @@
+@echo off
+mkdir "Tools\Decoding"
+mkdir "OGG"
+@echo on
+
 FOR %%a IN ("Game Files\*.PCK") DO ("Tools\quickbms.exe" "Tools\wavescan.bms" "Game Files" "Tools\Decoding")
 FOR %%b IN ("Game Files\*.BNK") DO ("Tools\bnkextr.exe" "%%b" & MOVE *.wav "Tools\Decoding")
 FOR %%c IN (Tools\Decoding\*.WAV) DO ("Tools\ww2ogg.exe" "%%c" --pcb Tools\packed_codebooks_aoTuV_603.bin & DEL "%%c")
