@@ -62,7 +62,7 @@ startfunction write                  # function "write" starts here, is called w
    log MEMORY_FILE OFFSET SIZE         # write file to memory
    math SIZE -= 8                  # subtract 8 bytes to get the riff size
    putVarChr MEMORY_FILE 4 SIZE long    # write the correct riff size to the header inside the memory
-   string NAME += ".wav"            # add extension to the name (the name could contain the name of the first marker if the file has markers)
+   string NAME += ".wem"            # add extension to the name (the name could contain the name of the first marker if the file has markers)
    math SIZE += 8                  # add the subtracted 8 bytes again
    log NAME 0 SIZE MEMORY_FILE         # write file in memory to disk
 endfunction                        # remember that we continue with our next i now!
