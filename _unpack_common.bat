@@ -10,7 +10,7 @@ echo -- Unpacking to '%TYPE%'
 
 if "%TYPE%"=="WAV" (
 FOR %%a IN ("Game Files\*.PCK") DO ("Tools\quickbms.exe" "Tools\wavescan.bms" "Game Files" "Tools\Decoding")
-FOR %%b IN ("Game Files\*.BNK") DO ("Tools\bnkextr.exe" "%%b" & MOVE *.wav "Tools\Decoding")
+FOR %%b IN ("Game Files\*.BNK") DO ("Tools\bnkextr.exe" "%%b" & REN *.wav *.wem & MOVE *.wem "Tools\Decoding")
 FOR %%a IN ("Tools\Decoding\*.WEM") DO ("Tools\vgmstream-cli.exe" -o "WAV\%%~na.wav" "%%a")
 )
 
