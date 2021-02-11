@@ -1,24 +1,25 @@
 @echo off
-mkdir "Tools\Decoding"
-mkdir "OGG"
-mkdir "MP3"
-mkdir "WAV"
+
+mkdir Decoding > nul 2>&1
+mkdir OGG > nul 2>&1
+mkdir MP3 > nul 2>&1
+mkdir WAV > nul 2>&1
 
 set TYPE=%1
 echo -- Unpacking to '%TYPE%'
 @echo on
 
 if "%TYPE%"=="WAV" (
-FOR %%a IN ("Game Files\*.PCK") DO ("Tools\quickbms.exe" "Tools\wavescan.bms" "Game Files" "Tools\Decoding")
-FOR %%b IN ("Game Files\*.BNK") DO ("Tools\bnkextr.exe" "%%b" & REN *.wav *.wem & MOVE *.wem "Tools\Decoding")
-FOR %%a IN ("Tools\Decoding\*.WEM") DO ("Tools\vgmstream-cli.exe" -o "WAV\%%~na.wav" "%%a")
+FOR %%a IN ("Game Files\*.PCK") DO ("Tools\quickbms.exe" "Tools\wwise_pck_extractor.bms" "%%a" "Decoding")
+FOR %%b IN ("Game Files\*.BNK") DO ("Tools\bnkextr.exe" "%%b" & REN *.wav *.wem & MOVE *.wem "Decoding")
+FOR %%a IN ("Decoding\*.WEM") DO ("Tools\vgmstream-cli.exe" -o "WAV\%%~na.wav" "%%a" & echo.)
 )
 
 if "%TYPE%"=="OGG" (
-FOR %%a IN ("Game Files\*.PCK") DO ("Tools\quickbms.exe" "Tools\wavescan.bms" "Game Files" "Tools\Decoding")
-FOR %%b IN ("Game Files\*.BNK") DO ("Tools\bnkextr.exe" "%%b" & MOVE *.wav "Tools\Decoding")
-FOR %%c IN (Tools\Decoding\*.WAV) DO ("Tools\ww2ogg.exe" "%%c" --pcb Tools\packed_codebooks_aoTuV_603.bin & DEL "%%c")
-FOR %%d IN (Tools\Decoding\*.OGG) DO ("Tools\revorb.exe" "%%d" & MOVE "%%d" "%TYPE%")
+FOR %%a IN ("Game Files\*.PCK") DO ("Tools\quickbms.exe" "Tools\wavescan.bms" "%%a" "Decoding")
+FOR %%b IN ("Game Files\*.BNK") DO ("Tools\bnkextr.exe" "%%b" & MOVE *.wav "Decoding")
+FOR %%c IN (Decoding\*.WAV) DO ("Tools\ww2ogg.exe" "%%c" --pcb Tools\packed_codebooks_aoTuV_603.bin & DEL "%%c")
+FOR %%d IN (Decoding\*.OGG) DO ("Tools\revorb.exe" "%%d" & MOVE "%%d" "%TYPE%")
 )
 
 if "%TYPE%"=="MP3" (
@@ -58,28 +59,5 @@ echo Unpack finished! Files should be in the '%TYPE%' folder
 
 echo -------------------------------------------------------------
 echo.
-
-:choice
-
-set /P c=Should I delete BNKs and PCKs from the 'Game Files' folder [Y/N]?
-if /I "%c%" EQU "Y" goto :yes
-if /I "%c%" EQU "N" goto :hella_no
-goto :choice
-
-:yes
-
-FOR %%e IN ("Game Files\*.PCK") DO (DEL "%%e")
-FOR %%f IN ("Game Files\*.BNK") DO (DEL "%%f")
-
-echo Files deleted, enjoy your unpacked audio! -/u/Vextil ;)
-pause 
-exit
-
-:hella_no
-
-echo BNKs and PCKs kept, enjoy your unpacked audio! -/u/Vextil ;)
-
-pause
-exit
 
 pause
