@@ -6,6 +6,9 @@ mkdir MP3 > nul 2>&1
 mkdir WAV > nul 2>&1
 
 set TYPE=%1
+
+echo === Wwise_Unpacker v1.1 ===
+echo.
 echo -- Unpacking to '%TYPE%'
 @echo on
 
