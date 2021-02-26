@@ -1,0 +1,219 @@
+# Wwise AKPK packages (.PCK) extractor
+#
+# v1 by Nicknine
+# v2 by bnnm (old extensions, lang names)
+
+
+# set if cannot be autodetected: 62< uses old extensions, 62>= uses new extensions
+set BANK_VERSION long 0
+
+###
+
+idstring "AKPK"
+
+# Detect endianness
+goto 0x08
+get TEST long
+endian guess TEST
+endian save CURRENT_ENDIAN
+
+goto 0x04
+get HEADER_SIZE long # not counting padding
+get FLAG long # always 1?
+get SEC1_SIZE long # Languages
+get SEC2_SIZE long # Banks
+get SEC3_SIZE long # Sounds
+set SEC4_SIZE long 0 # Externals
+
+# Later Wwise versions (+2012) have the fourth section with "externals" (.wem set at runtime).
+xmath SUM "SEC1_SIZE + SEC2_SIZE + SEC3_SIZE + 0x10" # Detect its presense.
+if SUM < HEADER_SIZE
+    get SEC4_SIZE long
+endif
+
+###
+
+# Get languages
+callfunction PARSE_LANGS 1
+ 
+# Extract banks
+set SECTION_SIZE SEC2_SIZE
+set IS_SOUNDS long 0
+set IS_EXTERNALS long 0
+set EXT string "bnk"
+callfunction PARSE_TABLE 1
+
+# banks section always exists but may set 0 files = can't autodetect
+if BANK_VERSION == 0
+    # section 4 was added after .wem
+    if SEC4_SIZE == 0
+        print "can't detect bank version, assuming new (set manually)"
+    endif
+    math BANK_VERSION = 62
+endif
+
+# Extract sounds
+set SECTION_SIZE SEC3_SIZE
+set IS_SOUNDS long 1
+set IS_EXTERNALS long 0
+set EXT string "wem"
+callfunction PARSE_TABLE 1
+
+# Extract externals
+set SECTION_SIZE SEC4_SIZE
+set IS_SOUNDS long 1
+set IS_EXTERNALS long 1
+set EXT string "wem"
+callfunction PARSE_TABLE 1
+
+# last sound may be padding 
+
+###
+
+startfunction PARSE_LANGS
+    savepos STRINGS_OFFSET
+
+    get LANGS long
+    for I = 0 < LANGS
+        get LANG_OFFSET long
+        get LANG_ID long
+
+        math LANG_OFFSET += STRINGS_OFFSET
+
+        savepos CURRENT
+
+        # Language names may be stored as UTF-16 (current endian) or UTF-8
+        # depending on platform + version (older = UTF-16?).
+        # Detect UTF-16 by presence of null in UTF-16 chars (Wwise langs are +2 chars ASCII).
+
+        goto LANG_OFFSET
+        get TEST1 byte
+        get TEST2 byte
+
+        goto LANG_OFFSET
+        if TEST1 == 0 || TEST2 == 0
+            get LANG_NAME unicode
+        else
+            get LANG_NAME string
+        endif
+
+        # table isn't ordered by ID, but IDs are fixed (0=sfx, 1=english, etc)
+        putarray 0 LANG_ID LANG_NAME
+        goto CURRENT
+    next I
+
+    goto STRINGS_OFFSET
+    goto SEC1_SIZE 0 SEEK_CUR
+
+endfunction
+
+startfunction DETECT_BANK_VERSION
+    savepos CURRENT
+
+    goto OFFSET
+    get DUMMY long #BKHD
+    get DUMMY long #chunk size
+    get BANK_VERSION long
+    if BANK_VERSION > 0x1000
+        print "wrong bank version, assuming new (set manually)"
+        math BANK_VERSION = 62
+    endif
+
+    goto CURRENT
+endfunction
+
+startfunction PARSE_TABLE
+    if SECTION_SIZE == 0
+        return
+    endif
+
+    get FILES long
+    if FILES == 0
+        return
+    endif
+
+    xmath ENTRY_SIZE "(SECTION_SIZE - 0x04) / FILES"
+    if ENTRY_SIZE == 0x18
+        math ALT_MODE = 1
+    else
+        math ALT_MODE = 0
+    endif
+
+    for I = 0 < FILES
+        if ALT_MODE == 1 && IS_EXTERNALS == 1
+            #TODO: externals use 64b ID, but quickbms 32b doesn't support 64b vars
+            #get ID longlong
+
+            if CURRENT_ENDIAN == 0 #LE
+                get ID2 long
+                get ID1 long
+            else
+                get ID1 long
+                get ID2 long
+            endif
+        else
+            get ID long
+        endif
+
+        get BLOCK_SIZE long
+
+        if ALT_MODE == 1 && IS_EXTERNALS == 1
+            get SIZE long
+        elif ALT_MODE == 1
+            get SIZE longlong
+        else
+            get SIZE long
+        endif
+
+        get OFFSET long # START_BLOCK
+        get LANG_ID long
+
+
+        if BLOCK_SIZE != 0
+            math OFFSET * BLOCK_SIZE
+        endif
+
+        # get version from first bnk for proper sound extensions
+        if IS_SOUNDS == 0 AND BANK_VERSION == 0
+            callfunction DETECT_BANK_VERSION 1
+        endif
+
+        # get codec ID to guess extension
+        if IS_SOUNDS == 1 AND BANK_VERSION < 62
+            savepos CURRENT
+
+            math CODEC_OFFSET = OFFSET
+            math CODEC_OFFSET += 0x14 #maybe should find "fmt " chunk first
+            goto CODEC_OFFSET
+            get CODEC short
+
+            if CODEC == 0x0401 || CODEC == 0x0166 #0x0401: old XMA (not a codec)
+                set EXT string "xma"
+            elif CODEC == 0xFFFF
+                set EXT string "ogg"
+            else
+                set EXT string "wav" #PCM, PCMEX, ADPCM, WIIADPCM
+            endif
+
+            goto CURRENT
+        endif
+
+        # ID 0 is "sfx" so just print in root
+        if LANG_ID == 0
+            string PATH = ""
+        else
+            getarray LANG_NAME 0 LANG_ID 
+            string PATH p= "%s/" LANG_NAME
+        endif
+
+        if ALT_MODE == 1 && IS_EXTERNALS == 1
+            #TODO: should print as non-hex but quickbms 32b doesn't support 64b vars
+            string NAME p "%s%08x%08x.%s" PATH ID1 ID2 EXT
+        else
+            string NAME p "%s%u.%s" PATH ID EXT
+        endif
+
+        #print "%NAME%: %OFFSET|h% %SIZE|h%"
+        log NAME OFFSET SIZE
+    next I
+endfunction
