@@ -1,4 +1,4 @@
-FOR %%a IN ("Game Files\*.PCK") DO ("Tools\quickbms.exe" "Tools\wavescan.bms" "Game Files" "Tools\Decoding")
+"Tools\quickbms.exe" "Tools\wavescan.bms" "Game Files" "Tools\Decoding"
 FOR %%b IN ("Game Files\*.BNK") DO ("Tools\bnkextr.exe" "%%b" & MOVE *.wav "Tools\Decoding")
 FOR %%c IN (Tools\Decoding\*.WAV) DO ("Tools\ww2ogg.exe" "%%c" --pcb Tools\packed_codebooks_aoTuV_603.bin & DEL "%%c")
 FOR %%d IN (Tools\Decoding\*.OGG) DO ("Tools\revorb.exe" "%%d" & MOVE "%%d" "MP3")
@@ -29,7 +29,7 @@ echo              '\ : /'
 echo   -.'-/\\\-.'//.-'/:'\.'-.JrS'.'-=_\\
 echo ' -.'-.\\'-.'//.-'.`-.'_\\-.'.-\'.-//
 echo      Watch out, it's the tornado!
-                                                                 
+
 echo.
 echo -------------------------------------------------------------
 
@@ -51,14 +51,14 @@ FOR %%e IN ("Game Files\*.PCK") DO (DEL "%%e")
 FOR %%f IN ("Game Files\*.BNK") DO (DEL "%%f")
 
 echo Files deleted, enjoy your unpacked audio! -/u/Vextil ;)
-pause 
+pause
 exit
 
 :hella_no
 
 echo BNKs and PCKs kept, enjoy your unpacked audio! -/u/Vextil ;)
 
-pause 
+pause
 exit
 
 pause
